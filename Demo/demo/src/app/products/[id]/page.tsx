@@ -11,6 +11,8 @@ type Product = {
   gia_km: number;
   hinh: string;
   mo_ta?: string;
+  tac_gia?: string;
+  book_type?: string;
 };
 
 type Comment = {
@@ -37,16 +39,18 @@ export default function ProductDetail() {
         if (!res.ok) throw new Error("Không tìm thấy sản phẩm");
         return res.json();
       })
-      .then((data) =>
+      .then((data) => {
         setProduct({
-          id: Number(data.id),
-          ten_sp: data.ten_sp,
-          gia: Number(data.gia),
-          gia_km: Number(data.gia_km),
-          hinh: data.hinh,
-          mo_ta: data.mo_ta,
-        })
-      )
+          id: Number(data.id) || 0,
+          ten_sp: data.name || "Sản phẩm không tên",
+          gia: Number(data.price) || 0,
+          gia_km: Number(data.originalPrice) || 0,
+          hinh: data.image || "/no-image.png",
+          mo_ta: data.description || "",
+          tac_gia: data.tac_gia || "Không rõ",
+          book_type: data.book_type || "Không rõ loại bìa",
+        });
+      })
       .catch((err) => console.error("Lỗi tải sản phẩm:", err))
       .finally(() => setLoading(false));
   }, [id]);
@@ -55,8 +59,12 @@ export default function ProductDetail() {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      const u = JSON.parse(storedUser);
-      setUser({ id: u.id, name: u.ho_ten });
+      try {
+        const u = JSON.parse(storedUser);
+        setUser({ id: Number(u.id), name: u.ho_ten || "Người dùng" });
+      } catch {
+        console.warn("Không parse được user từ localStorage");
+      }
     }
   }, []);
 
@@ -64,7 +72,7 @@ export default function ProductDetail() {
   useEffect(() => {
     fetch(`http://localhost:3003/comments/${id}`)
       .then((res) => res.json())
-      .then((data) => setComments(data))
+      .then((data) => setComments(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Lỗi tải bình luận:", err));
   }, [id]);
 
@@ -82,6 +90,7 @@ export default function ProductDetail() {
         name: product.ten_sp,
         price: product.gia_km > 0 ? product.gia_km : product.gia,
         image: product.hinh,
+        book_type: product.book_type || "",
         quantity,
       });
     }
@@ -162,19 +171,41 @@ export default function ProductDetail() {
               </p>
               <p className="text-danger fs-3 fw-bold mb-1">
                 {product.gia_km.toLocaleString()}đ{" "}
-                <Badge bg="success">
-                  -{Math.round(((product.gia - product.gia_km) / product.gia) * 100)}%
-                </Badge>
+                {product.gia > 0 && (
+                  <Badge bg="success">
+                    -
+                    {Math.round(
+                      ((product.gia - product.gia_km) / product.gia) * 100
+                    )}
+                    %
+                  </Badge>
+                )}
               </p>
               <p className="text-success fw-semibold">
-                Tiết kiệm: {(product.gia - product.gia_km).toLocaleString()}đ
+                Tiết kiệm:{" "}
+                {(product.gia - product.gia_km > 0
+                  ? product.gia - product.gia_km
+                  : 0
+                ).toLocaleString()}
+                đ
               </p>
             </>
           ) : (
-            <p className="text-danger fs-3 fw-bold">{product.gia.toLocaleString()}đ</p>
+            <p className="text-danger fs-3 fw-bold">
+              {product.gia.toLocaleString()}đ
+            </p>
           )}
 
-          <p className="mt-3">{product.mo_ta || "📖 Chưa có mô tả cho sách này."}</p>
+          <p className="mt-3">
+            {product.mo_ta || "📖 Chưa có mô tả cho sách này."}
+          </p>
+
+          <p className="mt-2 text-muted">✍️ Tác giả: {product.tac_gia}</p>
+
+          {/* Hiển thị loại bìa */}
+          {product.book_type && (
+            <p className="mt-1 text-muted">📖 Loại bìa: {product.book_type}</p>
+          )}
 
           {/* Số lượng */}
           <div className="d-flex align-items-center mt-4 mb-4">
@@ -190,7 +221,9 @@ export default function ProductDetail() {
                 type="number"
                 min={1}
                 value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
+                onChange={(e) =>
+                  setQuantity(Math.max(1, Number(e.target.value) || 1))
+                }
                 className="form-control text-center"
               />
               <button
@@ -203,18 +236,18 @@ export default function ProductDetail() {
           </div>
 
           {/* Nút thêm giỏ */}
-        <button
-          className="btn px-4 py-2 fw-bold w-100 w-md-auto"
-          style={{
-          borderRadius: "30px",
-           background: "linear-gradient(45deg, #f1c40f, #f39c12)", // vàng sáng -> vàng cam
-          border: "none", 
-          color: "white",
-          }}
-          onClick={addToCart}>
-          🛒 Thêm vào giỏ hàng
-        </button>
-
+          <button
+            className="btn px-4 py-2 fw-bold w-100 w-md-auto"
+            style={{
+              borderRadius: "30px",
+              background: "linear-gradient(45deg, #f1c40f, #f39c12)",
+              border: "none",
+              color: "white",
+            }}
+            onClick={addToCart}
+          >
+            🛒 Thêm vào giỏ hàng
+          </button>
         </div>
       </div>
 
@@ -231,7 +264,10 @@ export default function ProductDetail() {
               onChange={(e) => setCommentContent(e.target.value)}
               rows={3}
             />
-            <button className="btn btn-primary w-25" onClick={handleCommentSubmit}>
+            <button
+              className="btn btn-primary w-25"
+              onClick={handleCommentSubmit}
+            >
               Gửi bình luận
             </button>
           </div>

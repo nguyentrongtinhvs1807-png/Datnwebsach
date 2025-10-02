@@ -29,18 +29,20 @@ const db = mysql.createConnection({
 // ================== MAP SẢN PHẨM ==================
 const mapProduct = (row) => ({
   id: row.id,
-  name: row.ten_sp,
-  price: row.gia,
-  originalPrice: row.gia_km,
-  image: row.hinh,
-  description: row.mo_ta,
-  hot: row.hot,
+  name: row.ten_sp || "Không rõ tên",
+  price: Number(row?.gia) || 0,               // ép về số
+  originalPrice: Number(row?.gia_km) || 0,
+  image: row.hinh || "",
+  description: row.mo_ta || "Chưa có mô tả",
+  hot: Number(row?.hot) || 0,
+  tac_gia: row.tac_gia || "Không rõ tác giả",
+    book_type: row.book_type || "Không rõ loại bìa"
 });
 
 // ================== API SẢN PHẨM ==================
 app.get("/products", (req, res) => {
   const sql = `
-    SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot, an_hien
+    SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot, an_hien, tac_gia, book_type
     FROM san_pham
     WHERE an_hien = 1
     ORDER BY id DESC
@@ -53,28 +55,28 @@ app.get("/products", (req, res) => {
 
 app.get("/products/:id", (req, res) => {
   const { id } = req.params;
-  const sql = `SELECT * FROM san_pham WHERE id = ? LIMIT 1`;
+  const sql = `SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot, an_hien, tac_gia, book_type FROM san_pham WHERE id = ? LIMIT 1`;
   db.query(sql, [id], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     if (results.length === 0)
       return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
-    res.json(results[0]);
+    res.json(mapProduct(results[0]));
   });
 });
 
 app.put("/products/:id", (req, res) => {
   const { id } = req.params;
-  const { name, price, originalPrice, image, description, hot } = req.body;
+  const { name, price, originalPrice, image, description, hot, tac_gia } = req.body;
 
   const sql = `
     UPDATE san_pham
-    SET ten_sp = ?, gia = ?, gia_km = ?, hinh = ?, mo_ta = ?, hot = ?
+    SET ten_sp = ?, gia = ?, gia_km = ?, hinh = ?, mo_ta = ?, hot = ?, tac_gia = ?
     WHERE id = ?
   `;
 
   db.query(
     sql,
-    [name, price, originalPrice, image, description, hot ?? 0, id],
+    [name, price, originalPrice, image, description, hot ?? 0, tac_gia, id],
     (err, results) => {
       if (err) {
         console.error("❌ SQL Error:", err);
@@ -92,7 +94,16 @@ app.put("/products/:id", (req, res) => {
 
 app.get("/hotProducts", (req, res) => {
   const sql = `
-    SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot
+    SELECT 
+      id, 
+      ten_sp, 
+      gia, 
+      gia_km, 
+      hinh, 
+      mo_ta, 
+      hot, 
+      tac_gia,
+      book_type
     FROM san_pham
     WHERE hot = 1 AND an_hien = 1
     ORDER BY id DESC
@@ -106,7 +117,7 @@ app.get("/hotProducts", (req, res) => {
 
 app.get("/saleProducts", (req, res) => {
   const sql = `
-    SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot
+    SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot, tac_gia, book_type
     FROM san_pham
     WHERE gia_km > 0 AND (hot IS NULL OR hot = 0) AND an_hien = 1
     ORDER BY id DESC
@@ -120,7 +131,7 @@ app.get("/saleProducts", (req, res) => {
 
 app.get("/newProducts", (req, res) => {
   const sql = `
-    SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot, ngay
+    SELECT id, ten_sp, gia, gia_km, hinh, mo_ta, hot, ngay, tac_gia
     FROM san_pham
     WHERE an_hien = 1
     ORDER BY ngay DESC
@@ -494,6 +505,38 @@ app.delete("/products/:id", (req, res) => {
   db.query(sql, [id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: "✅ Xóa sản phẩm thành công!" });
+  });
+});
+// ================== API STATS (gộp 1 endpoint) ==================
+app.get("/stats", (req, res) => {
+  const queries = {
+    products: "SELECT COUNT(*) AS total FROM san_pham",
+    users: "SELECT COUNT(*) AS total FROM users",
+    orders: "SELECT COUNT(*) AS total FROM don_hang",
+    revenue: `
+      SELECT DATE_FORMAT(thoi_diem_mua, "%Y-%m") AS month, 
+             SUM(tong_tien) AS total
+      FROM don_hang
+      GROUP BY month
+      ORDER BY month
+    `
+  };
+
+  let results = {};
+  let done = 0;
+
+  Object.entries(queries).forEach(([key, sql]) => {
+    db.query(sql, (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      // revenue là danh sách → giữ nguyên, còn lại chỉ lấy số
+      results[key] = key === "revenue" ? rows : rows[0].total;
+
+      done++;
+      if (done === Object.keys(queries).length) {
+        res.json(results);
+      }
+    });
   });
 });
 

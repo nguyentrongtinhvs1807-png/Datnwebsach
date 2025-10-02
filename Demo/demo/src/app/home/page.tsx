@@ -18,7 +18,10 @@ interface Product {
   image: string;
   description?: string;
   hot?: number;
+  tac_gia?: string; 
+  book_type: string; 
 }
+
 
 export default function Home() {
   const [saleProducts, setSaleProducts] = useState<Product[]>([]);
@@ -127,14 +130,21 @@ export default function Home() {
                 <div className="carousel-inner">
                   <div className="carousel-item active">
                     <img
-                      src="https://bookbuy.vn/Res/Images/Album/d2454ade-31db-41b6-80c6-80694f91080c.jpg"
+                      src="/image/b9690ac7ec4b7c94d44d9e519b6c30e7.jpg"
                       className="d-block w-100 banner-img"
                       alt="Banner 1"
                     />
                   </div>
                   <div className="carousel-item">
                     <img
-                      src="https://bookbuy.vn/Res/Images/Album/bdc99479-f8af-499a-b726-b39b2d7e8f37.jpg"
+                      src="/image/0f342e41bb8009c013ee9435f249b3d7.jpg"
+                      className="d-block w-100 banner-img"
+                      alt="Banner 2"
+                    />
+                  </div>
+                  <div className="carousel-item">
+                    <img
+                      src="/image/a752d29dbfd7abdb981a2f35aa12a266.jpg"
                       className="d-block w-100 banner-img"
                       alt="Banner 2"
                     />
@@ -173,17 +183,19 @@ export default function Home() {
 
       {/* ================ Sale Products ================ */}
       <Container className="mt-5">
-        <h2 className="section-title">🔥 Sản phẩm Mới</h2>
+        <h2 className="section-title">🔥 Thể Loại Manga</h2>
         <Row>
           {filteredSaleProducts.length > 0 ? (
             filteredSaleProducts.map((product) => (
               <Col key={product.id} xs={6} sm={6} md={4} lg={3} className="mb-4">
                 <Card className="product-card h-100">
-                  <span className="badge bg-success position-absolute top-0 start-0 m-2">Sale</span>
+                  <span className="badge bg-success position-absolute top-0 start-0 m-2">New</span>
                   <Card.Img variant="top" src={product.image} alt={product.name} className="p-3 product-image" />
                   <Card.Body className="d-flex flex-column align-items-center justify-content-between">
                     <div className="w-100 text-center mb-2">
                       <Card.Title className="text-truncate">{product.name}</Card.Title>
+                      <Card.Text className="text-success fw-bold">{product.tac_gia}</Card.Text>
+                      <Card.Text className="text-primary">Loại bìa: {product.book_type}</Card.Text>
                       <h5 className="text-danger">{formatPrice(product.price)}</h5>
                       {product.originalPrice && (
                         <p className="text-muted text-decoration-line-through">
@@ -204,7 +216,7 @@ export default function Home() {
 
       {/* ================ Hot Products ================ */}
       <Container className="mt-5">
-        <h2 className="section-title">⭐ Sản phẩm Nổi Bật</h2>
+        <h2 className="section-title">⭐ Văn Học việt Nam</h2>
         <Row>
           {filteredHotProducts.length > 0 ? (
             filteredHotProducts.map((product) => (
@@ -215,7 +227,10 @@ export default function Home() {
                   <Card.Body className="d-flex flex-column align-items-center justify-content-between">
                     <div className="w-100 text-center mb-2">
                       <Card.Title className="text-truncate">{product.name}</Card.Title>
+                      <Card.Text className="text-success fw-bold">{product.tac_gia}</Card.Text>
+                      <Card.Text className="text-primary">Loại bìa: {product.book_type}</Card.Text>
                       <h5 className="text-danger">{formatPrice(product.price)}</h5>
+                      
                       {product.originalPrice && (
                         <p className="text-muted text-decoration-line-through">
                           {formatPrice(product.originalPrice)}
@@ -278,7 +293,7 @@ export default function Home() {
     ))}
   </Row>
 </Container>
-
+   
     </>
   );
 }

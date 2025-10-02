@@ -9,6 +9,8 @@ type Product = {
   originalPrice?: number | null;
   image?: string | null;
   description?: string | null;
+  tac_gia?: string | null;
+  book_type: string;
 };
 
 type Post = {
@@ -21,27 +23,24 @@ type Post = {
 export default function ProductList() {
   const [products, setProducts] = useState<Product[]>([]);
 
-  // Fake data cho bài viết (hardcode, không cần API)
+  // Fake data cho bài viết
   const posts: Post[] = [
     {
       id: 1,
       title: "Top 10 cuốn sách hay nhất mọi thời đại",
-      image:
-        "/image/sach-hay-thumbnail.jpg",
+      image: "/image/sach-hay-thumbnail.jpg",
       url: "https://vnexpress.net/sach-hay-4567890.html",
     },
     {
       id: 2,
       title: "Bí quyết đọc sách nhanh và hiệu quả",
-      image:
-        "/image/cach-doc-sach-nhanh.jpg",
+      image: "/image/cach-doc-sach-nhanh.jpg",
       url: "https://zingnews.vn/bi-quyet-doc-sach-post456789.html",
     },
     {
       id: 3,
       title: "Xu hướng sách mới năm 2025",
-      image:
-        "/image/file-7tHt.jpg",
+      image: "/image/file-7tHt.jpg",
       url: "https://tuoitre.vn/xu-huong-sach-2025-456789.htm",
     },
   ];
@@ -58,63 +57,11 @@ export default function ProductList() {
 
   return (
     <div className="container mt-5">
-      {/* --- Banner Slider lớn --- */}
-      <div
-        id="bannerCarousel"
-        className="carousel slide mb-5"
-        data-bs-ride="carousel"
-      >
-        <div className="carousel-inner rounded shadow-sm">
-          <div className="carousel-item active">
-            <img
-              src="https://theme.hstatic.net/200000845405/1001223012/14/home_slider_image_1.jpg?v=453"
-              className="d-block w-100"
-              alt="Banner 1"
-              style={{ maxHeight: "350px", objectFit: "cover" }}
-            />
-          </div>
-          <div className="carousel-item">
-            <img
-              src="https://theme.hstatic.net/200000845405/1001223012/14/home_slider_image_2.jpg?v=453"
-              className="d-block w-100"
-              alt="Banner 2"
-              style={{ maxHeight: "350px", objectFit: "cover" }}
-            />
-          </div>
-          <div className="carousel-item">
-            <img
-              src="https://theme.hstatic.net/200000845405/1001223012/14/col2_htb_img_2.jpg?v=453"
-              className="d-block w-100"
-              alt="Banner 3"
-              style={{ maxHeight: "350px", objectFit: "cover" }}
-            />
-          </div>
-        </div>
-
-        {/* Nút điều khiển */}
-        <button
-          className="carousel-control-prev"
-          type="button"
-          data-bs-target="#bannerCarousel"
-          data-bs-slide="prev"
-        >
-          <span className="carousel-control-prev-icon"></span>
-        </button>
-        <button
-          className="carousel-control-next"
-          type="button"
-          data-bs-target="#bannerCarousel"
-          data-bs-slide="next"
-        >
-          <span className="carousel-control-next-icon"></span>
-        </button>
-      </div>
-
-      {/* --- Banner nhỏ quảng cáo đẹp --- */}
+      {/* --- Banner nhỏ quảng cáo --- */}
       <div className="row mb-5">
         <div className="col-md-4 mb-3">
           <img
-            src="https://theme.hstatic.net/1000363117/1000911694/14/ms_banner_img3.jpg?v=635"
+            src="/image/b9690ac7ec4b7c94d44d9e519b6c30e7.jpg"
             alt="Quảng cáo 1"
             className="img-fluid rounded shadow-sm w-100"
             style={{ maxHeight: "180px", objectFit: "cover" }}
@@ -122,7 +69,7 @@ export default function ProductList() {
         </div>
         <div className="col-md-4 mb-3">
           <img
-            src="https://theme.hstatic.net/1000363117/1000911694/14/ms_banner_img4.jpg?v=635"
+            src="/image/87a6df704dbfecf5d3a1fa190070b5e2.jpg"
             alt="Quảng cáo 2"
             className="img-fluid rounded shadow-sm w-100"
             style={{ maxHeight: "180px", objectFit: "cover" }}
@@ -130,7 +77,7 @@ export default function ProductList() {
         </div>
         <div className="col-md-4 mb-3">
           <img
-            src="https://theme.hstatic.net/1000363117/1000911694/14/ms_banner_img2.jpg?v=635"
+            src="/image/43656448182f8e5f216238dc130add08.jpg"
             alt="Quảng cáo 3"
             className="img-fluid rounded shadow-sm w-100"
             style={{ maxHeight: "180px", objectFit: "cover" }}
@@ -146,23 +93,28 @@ export default function ProductList() {
         {products.map((p) => (
           <div className="col-md-3 mb-4" key={p.id}>
             <div
-              className="card h-100 shadow-sm border-0"
+              className="card h-100 shadow-sm"
               style={{
                 borderRadius: "15px",
+                border: "2px solid #f1c40f33", // vàng nhạt
                 overflow: "hidden",
-                transition: "transform 0.3s, box-shadow 0.3s",
+                transition: "transform 0.3s, box-shadow 0.3s, border 0.3s",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.transform =
                   "translateY(-8px)";
                 (e.currentTarget as HTMLElement).style.boxShadow =
                   "0 10px 20px rgba(0,0,0,0.15)";
+                (e.currentTarget as HTMLElement).style.border =
+                  "2px solid #f1c40f"; // viền vàng đậm khi hover
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.transform =
                   "translateY(0)";
                 (e.currentTarget as HTMLElement).style.boxShadow =
                   "0 4px 6px rgba(0,0,0,0.1)";
+                (e.currentTarget as HTMLElement).style.border =
+                  "2px solid #f1c40f33"; // trở lại vàng nhạt
               }}
             >
               {/* Khung ảnh */}
@@ -186,14 +138,6 @@ export default function ProductList() {
                     transition: "transform 0.4s",
                   }}
                   className="card-img-top"
-                  onMouseEnter={(e) =>
-                    ((e.currentTarget as HTMLImageElement).style.transform =
-                      "scale(1.05)")
-                  }
-                  onMouseLeave={(e) =>
-                    ((e.currentTarget as HTMLImageElement).style.transform =
-                      "scale(1)")
-                  }
                 />
               </div>
 
@@ -205,6 +149,16 @@ export default function ProductList() {
                 >
                   {p.name}
                 </h6>
+                {p.tac_gia && (
+                  <p className="fw-semibold mb-1" style={{ color: "#2980b9" }}>
+                    {p.tac_gia}
+                  </p>
+                )}
+                {p.book_type && (
+                  <p className="fw-semibold mb-2" style={{ color: "#27ae60" }}>
+                    {p.book_type}
+                  </p>
+                )}
                 <p className="text-danger fw-bold fs-5 mb-1">
                   {Number(p.price).toLocaleString("vi-VN")}đ
                 </p>
@@ -230,20 +184,37 @@ export default function ProductList() {
           </div>
         ))}
 
-        {/* Nếu không có sản phẩm */}
         {products.length === 0 && (
           <p className="text-center text-muted">Không có sản phẩm nào</p>
         )}
       </div>
 
-      {/* --- Phần Bài viết --- */}
+      {/* --- Bài viết --- */}
       <h2 className="text-center mt-5 mb-4 fw-bold" style={{ color: "#2c3e50" }}>
         📰 BÀI VIẾT MỚI
       </h2>
       <div className="row">
         {posts.map((post) => (
           <div className="col-md-4 mb-4" key={post.id}>
-            <div className="card h-100 shadow-sm border-0 rounded-3">
+            <div
+              className="card h-100 shadow-sm rounded-3"
+              style={{
+                border: "2px solid #f1c40f33",
+                transition: "border 0.3s, box-shadow 0.3s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.border =
+                  "2px solid #f1c40f";
+                (e.currentTarget as HTMLElement).style.boxShadow =
+                  "0 10px 20px rgba(0,0,0,0.15)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.border =
+                  "2px solid #f1c40f33";
+                (e.currentTarget as HTMLElement).style.boxShadow =
+                  "0 4px 6px rgba(0,0,0,0.1)";
+              }}
+            >
               <img
                 src={post.image}
                 alt={post.title}
@@ -255,7 +226,7 @@ export default function ProductList() {
                   borderTopRightRadius: "12px",
                 }}
               />
-              <div className="card-body">
+              <div className="card-body text-center">
                 <h6 className="fw-bold">{post.title}</h6>
                 <Link
                   href={post.url}
