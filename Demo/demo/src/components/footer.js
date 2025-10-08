@@ -6,7 +6,7 @@ const Footer = () => {
         <div className="text-center mb-4">
         <img
   src="https://png.pngtree.com/png-clipart/20200727/original/pngtree-book-store-logo-template-sale-learning-logo-designs-vector-png-image_5272617.jpg"
-  alt="Bookstore"
+  alt="Pibook"
   className="mx-auto my-4"
   style={{ height: "60px", width: "auto", objectFit: "contain" }}
 />
@@ -74,7 +74,7 @@ const Footer = () => {
           {/* Luonvuituoi */}
           <div className="col-md-3 mb-3">
           cậy để bạn <strong>mua sách trực tuyến</strong>,  còn có quà
-            <h6 className="fw-bold text-uppercase text-warning">Bookstore</h6>
+            <h6 className="fw-bold text-uppercase text-warning">Pibook</h6>
             <ul className="list-unstyled">
               <li><a href="about" className="text-light text-decoration-none">Giới thiệu</a></li>
               <li><a href="#" className="text-light text-decoration-none">Facebook</a></li>

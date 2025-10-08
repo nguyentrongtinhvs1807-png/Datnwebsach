@@ -11,7 +11,7 @@ const app = express();
 // Cấu hình CORS cho frontend (localhost:3000)
 app.use(cors({
   origin: "http://localhost:3000",
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // 👈 thêm PATCH
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], 
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
@@ -539,6 +539,29 @@ app.get("/stats", (req, res) => {
     });
   });
 });
+
+// API lấy danh sách sách theo category id
+app.get("/books", (req, res) => {
+  const { category } = req.query;
+  let sql = `
+    SELECT id, ten_sp AS name, gia AS price, gia_km AS originalPrice, hinh AS image, tac_gia, book_type
+    FROM san_pham
+    WHERE an_hien = 1
+  `;
+  
+  if (category) {
+    sql += ` AND id_loai = ${db.escape(category)}`;
+  }
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Lỗi MySQL:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(results);
+  });
+});
+
 
 // ================== START SERVER ==================
 app.listen(3003, () => {

@@ -14,10 +14,10 @@ export default function About() {
         {/* Tiêu đề */}
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
           📚 Chào mừng đến với{" "}
-          <span className="text-blue-600">Nhà Sách Bookstore</span>
+          <span className="text-blue-600">Nhà Sách Pibook</span>
         </h1>
         <p className="text-lg text-gray-600 mb-6 leading-relaxed max-w-3xl mx-auto">
-          Bookstore là điểm đến lý tưởng cho những ai yêu sách. 
+        Pibook là điểm đến lý tưởng cho những ai yêu sách. 
           Chúng tôi mang đến hàng ngàn tựa sách đa dạng từ văn học, kỹ năng sống, kinh tế 
           cho đến truyện thiếu nhi. Sứ mệnh của chúng tôi là{" "}
           <strong className="text-blue-600">lan tỏa tri thức</strong> 
@@ -48,7 +48,7 @@ export default function About() {
 
         {/* Lý do chọn */}
         <h2 className="text-2xl font-semibold text-gray-800 mb-8">
-          ✨ Tại sao nên chọn Bookstore?
+          ✨ Tại sao nên chọn Pibook?
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           <div className="flex items-start gap-4 p-5 rounded-xl shadow bg-blue-50 hover:shadow-lg transition">

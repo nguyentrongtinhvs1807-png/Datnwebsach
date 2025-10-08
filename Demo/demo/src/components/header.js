@@ -47,7 +47,7 @@ const Header = () => {
           href="/home"
           className="fw-bold text-primary fs-4 text-decoration-none"
         >
-          Bookstore 
+          Pibook 
         </Link>
 
         {/* Navigation */}
@@ -118,6 +118,9 @@ const Header = () => {
                     </Dropdown.Item>
                     <Dropdown.Item as={Link} href="/admin/dashboard">
                       Quản lý Thống Kê
+                    </Dropdown.Item>
+                    <Dropdown.Item as={Link} href="/admin/voucher">
+                      Quản lý Voucher
                     </Dropdown.Item>
                   </>
                 ) : (

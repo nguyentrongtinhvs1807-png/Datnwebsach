@@ -16,7 +16,7 @@ export default function Policy() {
         {/* Tiêu đề chính */}
         <h1 className="text-center fw-bold mb-5 text-gradient display-5">
           <i className="bi bi-shield-check me-2"></i> Chính Sách{" "}
-          <span className="text-danger">Bookstore</span>
+          <span className="text-danger"></span>
         </h1>
 
         {/* Nội dung fade-in */}
@@ -37,7 +37,7 @@ export default function Policy() {
                     Vận Chuyển
                   </h2>
                   <p className="text-muted mb-0">
-                    Bookstore cam kết giao hàng trong{" "}
+                  Pibook cam kết giao hàng trong{" "}
                     <span className="fw-bold text-dark">2-5 ngày làm việc</span>.
                     Các khu vực xa trung tâm có thể mất thêm thời gian.
                   </p>
@@ -77,7 +77,7 @@ export default function Policy() {
                     Bảo Mật
                   </h2>
                   <p className="text-muted mb-0">
-                    Bookstore cam kết{" "}
+                  Pibook cam kết{" "}
                     <span className="fw-bold text-dark">
                       bảo vệ thông tin cá nhân
                     </span>{" "}
