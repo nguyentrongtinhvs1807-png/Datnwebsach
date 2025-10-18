@@ -14,13 +14,15 @@ type Product = {
 export default function CartPage() {
   const [cart, setCart] = useState<Product[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [totalQuantity, setTotalQuantity] = useState(0); // 🔹 tổng số lượng sản phẩm
 
+  // --- Lấy dữ liệu giỏ hàng từ localStorage ---
   useEffect(() => {
-    setMounted(true); 
+    setMounted(true);
     try {
       const storedCart = JSON.parse(localStorage.getItem("cart") || "[]");
 
-      // ✅ validate dữ liệu: chỉ giữ sản phẩm có price là số hợp lệ
+      // ✅ Giữ lại sản phẩm hợp lệ
       const validCart = storedCart.filter(
         (item: Product) =>
           item &&
@@ -31,15 +33,19 @@ export default function CartPage() {
 
       setCart(validCart);
       localStorage.setItem("cart", JSON.stringify(validCart));
+
+      // 🔹 Tính tổng số lượng
+      const totalQty = validCart.reduce(
+        (sum: number, item: Product) => sum + item.quantity,
+        0
+      );
+      setTotalQuantity(totalQty);
     } catch (error) {
       console.error("Lỗi đọc giỏ hàng:", error);
     }
   }, []);
 
-  if (!mounted) {
-    return <p className="text-center mt-4">Đang tải giỏ hàng...</p>;
-  }
-
+  // --- Hàm cập nhật số lượng ---
   const updateQuantity = (id: string, delta: number) => {
     const updatedCart = cart.map((item) =>
       item.id === id
@@ -48,24 +54,50 @@ export default function CartPage() {
     );
     setCart(updatedCart);
     localStorage.setItem("cart", JSON.stringify(updatedCart));
+
+    // 🔹 Cập nhật tổng số lượng
+    const totalQty = updatedCart.reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
+    setTotalQuantity(totalQty);
   };
 
+  // --- Hàm xóa sản phẩm ---
   const removeFromCart = (id: string) => {
-    if (!window.confirm("Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?")) return;
+    if (!window.confirm("Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?"))
+      return;
+
     const updatedCart = cart.filter((item) => item.id !== id);
     setCart(updatedCart);
     localStorage.setItem("cart", JSON.stringify(updatedCart));
+
+    // 🔹 Cập nhật tổng số lượng
+    const totalQty = updatedCart.reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
+    setTotalQuantity(totalQty);
   };
 
+  // --- Tổng tiền ---
   const totalPrice = cart.reduce(
     (sum, item) =>
       sum + (typeof item.price === "number" ? item.price * item.quantity : 0),
     0
   );
 
+  if (!mounted) {
+    return <p className="text-center mt-4">Đang tải giỏ hàng...</p>;
+  }
+
   return (
     <div className="container mt-4">
-      <h2>🛒 Giỏ hàng</h2>
+      <h2>
+        🛒 Giỏ hàng{" "}
+        <span className="badge bg-secondary ms-2">{totalQuantity}</span>
+      </h2>
+
       {cart.length === 0 ? (
         <p>
           Giỏ hàng trống! <Link href="/products">Tiếp tục mua sắm →</Link>
@@ -87,7 +119,13 @@ export default function CartPage() {
               {cart.map((product) => (
                 <tr key={product.id}>
                   <td>
-                    <img src={product.image} alt={product.name} width={60} />
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      width={60}
+                      height={60}
+                      style={{ objectFit: "cover", borderRadius: "8px" }}
+                    />
                   </td>
                   <td>{product.name}</td>
                   <td className="text-danger">
@@ -127,13 +165,20 @@ export default function CartPage() {
               ))}
             </tbody>
           </table>
-          <h4 className="text-end">
-            Tổng tiền:{" "}
-            <span className="text-danger">{totalPrice.toLocaleString()}đ</span>
-          </h4>
-          <Link href="/checkout">
-            <button className="btn btn-success float-end mt-3">Thanh toán</button>
-          </Link>
+
+          <div className="text-end mt-3">
+            <h4>
+              Tổng tiền:{" "}
+              <span className="text-danger fw-bold">
+                {totalPrice.toLocaleString()}đ
+              </span>
+            </h4>
+            <Link href="/checkout">
+              <button className="btn btn-success mt-3 px-4 py-2 fw-bold">
+                Thanh toán
+              </button>
+            </Link>
+          </div>
         </div>
       )}
     </div>

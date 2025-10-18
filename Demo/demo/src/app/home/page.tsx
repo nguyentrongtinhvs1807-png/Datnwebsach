@@ -5,61 +5,48 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Container, Row, Col, Card, Button } from "react-bootstrap";
 import { useRouter } from "next/navigation";
-import { FaChevronDown } from "react-icons/fa";
 import "bootstrap/dist/css/bootstrap.min.css";
 
-interface Product {
-  id: number;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  description?: string;
-  hot?: number;
-  tac_gia?: string;
-  book_type: string;
-}
-
-interface DanhMuc {
-  id: number;
-  ten_danh_muc: string;
+// ✅ Interface đầy đủ
+interface Book {
+  sach_id: number;
+  ten_sach: string;
+  ten_tac_gia: string;
+  ten_NXB: string;
+  gia_sach: number;
+  ton_kho_sach: number;
   mo_ta: string;
+  gg_sach: number;
+  loai_bia: string;
+  Loai_sach_id: number;
+  image?: string; // ✅ thêm để nhận URL ảnh
 }
 
 export default function Home() {
-  const [saleProducts, setSaleProducts] = useState<Product[]>([]);
-  const [hotProducts, setHotProducts] = useState<Product[]>([]);
-  const [danhMuc, setDanhMuc] = useState<DanhMuc[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [keyword, setKeyword] = useState("");
   const router = useRouter();
 
-  const filteredSaleProducts = saleProducts.filter((p) =>
-    p.name?.toLowerCase().includes(keyword.toLowerCase())
-  );
-  const filteredHotProducts = hotProducts.filter((p) =>
-    p.name?.toLowerCase().includes(keyword.toLowerCase())
-  );
-
+  // ✅ Import Bootstrap JS khi mount
   useEffect(() => {
-    fetch("http://localhost:3003/saleProducts")
-      .then((res) => res.json())
-      .then((data) => setSaleProducts(Array.isArray(data) ? data : []))
-      .catch(() => setSaleProducts([]));
-
-    fetch("http://localhost:3003/hotProducts")
-      .then((res) => res.json())
-      .then((data) => setHotProducts(Array.isArray(data) ? data : []))
-      .catch(() => setHotProducts([]));
-
-    // ✅ Lấy danh mục sách từ API Next.js
-    fetch("/api/danhmuc")
-      .then((res) => res.json())
-      .then((data) => setDanhMuc(Array.isArray(data) ? data : []))
-      .catch(() => setDanhMuc([]));
+    import("bootstrap/dist/js/bootstrap.bundle.min.js");
   }, []);
 
+  // ✅ Lấy dữ liệu từ API server.js
+  useEffect(() => {
+    fetch("http://localhost:3003/books")
+      .then((res) => res.json())
+      .then((data) => setBooks(Array.isArray(data) ? data : []))
+      .catch(() => setBooks([]));
+  }, []);
+
+  // ✅ Lọc theo từ khóa
+  const filteredBooks = books.filter((b) =>
+    b.ten_sach?.toLowerCase().includes(keyword.toLowerCase())
+  );
+
   const formatPrice = (price?: number) => {
-    if (price === undefined || price === null) return "Liên hệ";
+    if (!price) return "Liên hệ";
     return Number(price).toLocaleString("vi-VN") + "đ";
   };
 
@@ -72,9 +59,9 @@ export default function Home() {
             <Col xs={6} sm={4} md={3} className="d-flex align-items-center">
               <Link href="/" className="d-flex align-items-center text-decoration-none">
                 <img
-                  src="/image/logo-trong-suot 2.png"
+                  src="/image/z7124556721378_d0b1e93464381adf72fe03e78d1e91ba.jpg"
                   alt="Logo"
-                  style={{ height: "50px" }}
+                  style={{ height: "90px", width: "90px" }}
                   className="rounded-circle shadow-sm"
                 />
                 <span className="ms-2 fw-bold text-white fs-6 d-none d-md-inline">
@@ -107,60 +94,54 @@ export default function Home() {
         </Container>
       </header>
 
-      {/* ================ Sidebar + Banner ================ */}
+      {/* ================ Banner ================ */}
       <Container fluid className="mt-3">
         <Row className="gx-3">
           {/* Sidebar */}
           <Col xs={12} md={3} className="mb-3">
-            <div className="sidebar shadow-sm rounded bg-white h-100">
-              <h6 className="p-3 border-bottom d-flex align-items-center justify-content-between fw-bold">
-                Tất Cả Danh Mục <FaChevronDown />
-              </h6>
-              <ul className="list-unstyled m-0 p-3 categories-list">
-                {danhMuc.length > 0 ? (
-                  danhMuc.map((cat) => (
-                    <li key={cat.id}>
-                      <Link href={`/category/${cat.id}`}>📘 {cat.ten_danh_muc}</Link>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-muted">Đang tải danh mục...</li>
-                )}
-              </ul>
+            <div className="d-flex flex-column gap-3">
+              {["abc.jpg", "abcd.jpg"].map((img, i) => (
+                <div key={i} className="shadow-sm rounded overflow-hidden banner-small">
+                  <img
+                    src={`/image/${img}`}
+                    alt={`Banner nhỏ ${i + 1}`}
+                    className="w-100 rounded"
+                    style={{
+                      objectFit: "cover",
+                      height: "190px",
+                      borderRadius: "12px",
+                      transition: "transform 0.3s ease",
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           </Col>
 
-          {/* Banner */}
+          {/* Banner chính */}
           <Col xs={12} md={9} className="mb-3">
-            <div className="rounded shadow overflow-hidden banner">
+            <div className="rounded shadow overflow-hidden banner" style={{ height: "395px" }}>
               <div
                 id="mainBanner"
-                className="carousel slide"
+                className="carousel slide h-100"
                 data-bs-ride="carousel"
-                data-bs-interval="2000"
+                data-bs-interval="3000"
               >
-                <div className="carousel-inner">
-                  <div className="carousel-item active">
-                    <img
-                      src="/image/b9690ac7ec4b7c94d44d9e519b6c30e7.jpg"
-                      className="d-block w-100 banner-img"
-                      alt="Banner 1"
-                    />
-                  </div>
-                  <div className="carousel-item">
-                    <img
-                      src="/image/0f342e41bb8009c013ee9435f249b3d7.jpg"
-                      className="d-block w-100 banner-img"
-                      alt="Banner 2"
-                    />
-                  </div>
-                  <div className="carousel-item">
-                    <img
-                      src="/image/a752d29dbfd7abdb981a2f35aa12a266.jpg"
-                      className="d-block w-100 banner-img"
-                      alt="Banner 3"
-                    />
-                  </div>
+                <div className="carousel-inner h-100">
+                  {[
+                    "b9690ac7ec4b7c94d44d9e519b6c30e7.jpg",
+                    "0f342e41bb8009c013ee9435f249b3d7.jpg",
+                    "abcde.jpg",
+                  ].map((img, i) => (
+                    <div key={i} className={`carousel-item ${i === 0 ? "active" : ""} h-100`}>
+                      <img
+                        src={`/image/${img}`}
+                        className="d-block w-100 h-100 banner-img"
+                        alt={`Banner ${i + 1}`}
+                        style={{ objectFit: "cover" }}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -168,16 +149,148 @@ export default function Home() {
         </Row>
       </Container>
 
-      {/* ================ Category Icons ================ */}
-      <Container className="mt-5">
-        <Row className="justify-content-center text-center g-4">
+      <Container fluid className="mt-3">
+        <Row className="gx-3">
+          {/* Sidebar (2 banner nhỏ dọc) */}
+          <Col xs={12} md={3} className="mb-3">
+            <div className="d-flex flex-column gap-3">
+              <div className="shadow-sm rounded overflow-hidden banner-small">
+                <img
+                  src="/image/abc.jpg"
+                  alt="Banner nhỏ 1"
+                  className="w-100 rounded"
+                  style={{
+                    objectFit: "cover",
+                    height: "190px",
+                    borderRadius: "12px",
+                    transition: "transform 0.3s ease",
+                  }}
+                />
+              </div>
+              <div className="shadow-sm rounded overflow-hidden banner-small">
+                <img
+                  src="/image/abcd.jpg"
+                  alt="Banner nhỏ 2"
+                  className="w-100 rounded"
+                  style={{
+                    objectFit: "cover",
+                    height: "190px",
+                    borderRadius: "12px",
+                    transition: "transform 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+          </Col>
+
+          {/* Banner chính (carousel) */}
+          <Col xs={12} md={9} className="mb-3">
+            <div
+              className="rounded shadow overflow-hidden banner"
+              style={{ height: "395px" }}
+            >
+              <div
+                id="mainBanner"
+                className="carousel slide h-100"
+                data-bs-ride="carousel"
+                data-bs-interval="3000"
+              >
+                <div className="carousel-inner h-100">
+                  <div className="carousel-item active h-100">
+                    <img
+                      src="/image/b9690ac7ec4b7c94d44d9e519b6c30e7.jpg"
+                      className="d-block w-100 h-100 banner-img"
+                      alt="Banner 1"
+                      style={{ objectFit: "cover" }}
+                    />
+                  </div>
+                  <div className="carousel-item h-100">
+                    <img
+                      src="/image/0f342e41bb8009c013ee9435f249b3d7.jpg"
+                      className="d-block w-100 h-100 banner-img"
+                      alt="Banner 2"
+                      style={{ objectFit: "cover" }}
+                    />
+                  </div>
+                  <div className="carousel-item h-100">
+                    <img
+                      src="/image/abcde.jpg"
+                      className="d-block w-100 h-100 banner-img"
+                      alt="Banner 3"
+                      style={{ objectFit: "cover" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        {/* === 4 Banner nhỏ ngang phía dưới === */}
+        <Row className="mt-3 gx-3">
           {[
-            { icon: "⚡", label: "Voucher", color: "bg-danger", href: "/voucher" },
-            { icon: "🔥", label: "Hot deal", color: "bg-warning" },
-            { icon: "📖", label: "Văn học", color: "bg-primary", href: "/category/1" },
-            { icon: "📚", label: "Blog sách hay", color: "bg-success" },
-            { icon: "👶", label: "Thiếu nhi", color: "bg-warning" },
-            { icon: "💵", label: "Kinh tế", color: "bg-success" },
+            "banner-ngang-1.jpg",
+            "banner-ngang-2.jpg",
+            "banner-ngang-3.jpg",
+            "banner-ngang-4.jpg",
+          ].map((img, i) => (
+            <Col key={i} xs={6} md={3} className="mb-3">
+              <div className="shadow-sm rounded overflow-hidden banner-small-horizontal">
+                <img
+                  src={`/image/${img}`}
+                  alt={`Banner ngang ${i + 1}`}
+                  className="w-100 rounded"
+                  style={{
+                    objectFit: "cover",
+                    height: "182px",
+                    borderRadius: "12px",
+                    transition: "transform 0.3s ease",
+                  }}
+                />
+              </div>
+            </Col>
+          ))}
+        </Row>
+
+        <style jsx>{`
+          .banner-small img:hover,
+          .banner-small-horizontal img:hover {
+            transform: scale(1.05);
+          }
+        `}</style>
+
+        {/* === 2 banner ngang to phía dưới === */}
+        <Row className="mt-3 g-3">
+          {["banner-ngang-1.jpg", "banner-ngang-2.jpg"].map((b, i) => (
+            <Col xs={12} md={6} key={i}>
+              <div className="shadow-sm rounded overflow-hidden">
+                <img
+                  src="/image/block_1.jpg"
+                  alt={`Banner ngang ${i + 1}`}
+                  className="w-100 rounded"
+                  style={{
+                    objectFit: "cover",
+                    height: "70px",
+                    borderRadius: "12px",
+                  }}
+                />
+              </div>
+            </Col>
+          ))}
+        </Row>
+      </Container>
+
+
+      {/* ================ Danh mục ================ */}
+      <Container className="mt-4">
+        <Row className="justify-content-center text-center g-2">
+          {[
+            { src: "https://nhasachphuongnam.com/images/promo/274/lego.png", label: "Lego", id: 1 },
+            { src: "https://nhasachphuongnam.com/images/promo/274/puzzlr.png", label: "Jigsaw/Puzzle", id: 2 },
+            { src: "https://nhasachphuongnam.com/images/promo/274/manga.png", label: "Manga", id: 3 },
+            { src: "https://nhasachphuongnam.com/images/promo/274/gift.png", label: "Gift Books For You", id: 4 },
+            { src: "https://nhasachphuongnam.com/images/promo/274/teen.png", label: "Tiệc Sách Tuổi Teen", id: 5 },
+            { src: "https://nhasachphuongnam.com/images/promo/274/s%C3%A1ch_c%C5%A9.png", label: "Phiên Chợ Sách Cũ", id: 6 },
           ].map((cat, index) => (
             <Col
               key={index}
@@ -185,126 +298,71 @@ export default function Home() {
               sm={4}
               md={3}
               lg={2}
-              className="d-flex flex-column align-items-center"
+              className="d-flex flex-column align-items-center mb-3"
+              style={{ padding: "4px" }}
             >
-              {cat.href ? (
-                <Link
-                  href={cat.href}
-                  className="text-decoration-none text-dark d-flex flex-column align-items-center"
-                >
-                  <div
-                    className={`category-icon rounded-circle shadow ${cat.color}`}
-                    style={{
-                      width: "70px",
-                      height: "70px",
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      fontSize: "28px",
-                    }}
-                  >
-                    {cat.icon}
-                  </div>
-                  <small className="mt-2 fw-semibold">{cat.label}</small>
-                </Link>
-              ) : (
-                <>
-                  <div
-                    className={`category-icon rounded-circle shadow ${cat.color}`}
-                    style={{
-                      width: "70px",
-                      height: "70px",
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      fontSize: "28px",
-                    }}
-                  >
-                    {cat.icon}
-                  </div>
-                  <small className="mt-2 fw-semibold">{cat.label}</small>
-                </>
-              )}
+              <Link
+                href={`/category/${cat.id}`}
+                className="text-decoration-none text-dark"
+                style={{ transition: "transform 0.25s ease" }}
+              >
+                <div className="d-flex justify-content-center align-items-center" style={{ width: "130px", height: "130px" }}>
+                  <img src={cat.src} alt={cat.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                </div>
+                <small className="mt-2 fw-semibold d-block">{cat.label}</small>
+              </Link>
             </Col>
           ))}
         </Row>
       </Container>
 
-      {/* ================ Sale Products ================ */}
+      {/* ================ Danh sách Sách ================ */}
       <Container className="mt-5">
-        <h2 className="section-title">🔥 Thể Loại Manga</h2>
+        <h2 className="section-title">📚 Danh Sách Sách</h2>
         <Row>
-          {filteredSaleProducts.length > 0 ? (
-            filteredSaleProducts.map((product) => (
-              <Col key={product.id} xs={6} sm={6} md={4} lg={3} className="mb-4">
-                <Card className="product-card h-100">
-                  <span className="badge bg-success position-absolute top-0 start-0 m-2">New</span>
+          {filteredBooks.length > 0 ? (
+            filteredBooks.map((book) => (
+              <Col key={book.sach_id} xs={6} sm={6} md={4} lg={3} className="mb-4">
+                <Card className="product-card h-100 shadow-sm">
                   <Card.Img
                     variant="top"
-                    src={product.image}
-                    alt={product.name}
-                    className="p-3 product-image"
+                    src={
+                      book.image && book.image.trim() !== ""
+                        ? book.image
+                        : "/image/default-book.jpg"
+                    }
+                    alt={book.ten_sach}
+                    className="p-3"
+                    style={{
+                      height: "250px",
+                      objectFit: "contain",
+                      borderRadius: "10px",
+                    }}
                   />
-                  <Card.Body className="d-flex flex-column align-items-center justify-content-between">
-                    <div className="w-100 text-center mb-2">
-                      <Card.Title className="text-truncate">{product.name}</Card.Title>
-                      <Card.Text className="text-success fw-bold">{product.tac_gia}</Card.Text>
-                      <Card.Text className="text-primary">Loại bìa: {product.book_type}</Card.Text>
-                      <h5 className="text-danger">{formatPrice(product.price)}</h5>
-                      {product.originalPrice && (
-                        <p className="text-muted text-decoration-line-through">
-                          {formatPrice(product.originalPrice)}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      variant="warning"
-                      className="w-100"
-                      onClick={() => router.push(`/products/${product.id}`)}
-                    >
-                      Xem chi tiết
-                    </Button>
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))
-          ) : (
-            <p className="text-center">Không tìm thấy sản phẩm nào</p>
-          )}
-        </Row>
-      </Container>
 
-      {/* ================ Hot Products ================ */}
-      <Container className="mt-5">
-        <h2 className="section-title">⭐ Văn Học Việt Nam</h2>
-        <Row>
-          {filteredHotProducts.length > 0 ? (
-            filteredHotProducts.map((product) => (
-              <Col key={product.id} xs={6} sm={6} md={4} lg={3} className="mb-4">
-                <Card className="product-card h-100">
-                  <span className="badge bg-warning position-absolute top-0 start-0 m-2">Hot</span>
-                  <Card.Img
-                    variant="top"
-                    src={product.image}
-                    alt={product.name}
-                    className="p-3 product-image"
-                  />
                   <Card.Body className="d-flex flex-column align-items-center justify-content-between">
-                    <div className="w-100 text-center mb-2">
-                      <Card.Title className="text-truncate">{product.name}</Card.Title>
-                      <Card.Text className="text-success fw-bold">{product.tac_gia}</Card.Text>
-                      <Card.Text className="text-primary">Loại bìa: {product.book_type}</Card.Text>
-                      <h5 className="text-danger">{formatPrice(product.price)}</h5>
-                      {product.originalPrice && (
-                        <p className="text-muted text-decoration-line-through">
-                          {formatPrice(product.originalPrice)}
-                        </p>
-                      )}
+                    <div className="text-center w-100">
+                      <Card.Title className="text-truncate fw-bold">
+                        {book.ten_sach}
+                      </Card.Title>
+
+                      <Card.Text className="text-success fw-semibold">
+                        {book.ten_tac_gia}
+                      </Card.Text>
+
+                      <Card.Text className="text-primary">
+                        Loại bìa: {book.loai_bia}
+                      </Card.Text>
+
+                      <h5 className="text-danger mb-0">
+                        {formatPrice(book.gia_sach)}
+                      </h5>
                     </div>
+
                     <Button
                       variant="warning"
-                      className="w-100"
-                      onClick={() => router.push(`/products/${product.id}`)}
+                      className="w-100 mt-3"
+                      onClick={() => router.push(`/products/${book.sach_id}`)}
                     >
                       Xem chi tiết
                     </Button>
@@ -313,58 +371,12 @@ export default function Home() {
               </Col>
             ))
           ) : (
-            <p className="text-center">Không tìm thấy sản phẩm nào</p>
+            <p className="text-center">Không có sách nào để hiển thị</p>
           )}
         </Row>
       </Container>
 
       <AboutBookbuy />
-
-      {/* ================ News Section ================ */}
-      <Container className="mt-5">
-        <h2 className="section-title">📰 Tin Tức & Blog</h2>
-        <Row>
-          {[
-            {
-              id: 1,
-              title: "LMHT: Top 5 tuyển thủ Đường Giữa tại CKTG 2022",
-              image: "/image/Tong-quan-20.jpg",
-              desc: "Danh sách những cuốn sách hay, được nhiều độc giả bình chọn.",
-            },
-            {
-              id: 2,
-              title: "Lịch thi đấu Chung kết thế giới LMHT 2025",
-              image:
-                "/image/ket-qua-chung-ket-the-gioi-2_b474288dc1154ec0834cc89aa1f966eb_1024x1024.jpg",
-              desc: "Khám phá cách sử dụng bảng vẽ để học tập sáng tạo hơn.",
-            },
-            {
-              id: 3,
-              title: "Bắt cóc con nít người chơi Yasuo xuất sắc nhất",
-              image: "/image/1735121535_Yasuonhba.png",
-              desc: "Khuyến khích sinh viên đọc sách mỗi ngày để nâng cao kiến thức.",
-            },
-          ].map((news) => (
-            <Col key={news.id} xs={12} md={4} className="mb-4">
-              <Card className="h-100 shadow-sm">
-                <Card.Img
-                  variant="top"
-                  src={news.image}
-                  alt={news.title}
-                  style={{ height: "200px", objectFit: "cover" }}
-                />
-                <Card.Body>
-                  <Card.Title>{news.title}</Card.Title>
-                  <Card.Text>{news.desc}</Card.Text>
-                  <Button variant="link" className="p-0 text-warning">
-                    Đọc tiếp →
-                  </Button>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      </Container>
     </>
   );
 }

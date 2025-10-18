@@ -122,6 +122,9 @@ const Header = () => {
                     <Dropdown.Item as={Link} href="/admin/voucher">
                       Quản lý Voucher
                     </Dropdown.Item>
+                    <Dropdown.Item as={Link} href="/admin/danhmuc">
+                      Quản lý Danh Mục
+                    </Dropdown.Item>
                   </>
                 ) : (
                   <>

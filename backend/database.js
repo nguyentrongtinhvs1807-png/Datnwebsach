@@ -1,7 +1,7 @@
 const { Sequelize, DataTypes } = require("sequelize");
 
 // Kết nối database
-const sequelize = new Sequelize("laptop_node", "root", "", {
+const sequelize = new Sequelize("pibook_db", "root", "", {
   host: "localhost",
   dialect: "mysql",
   logging: false,

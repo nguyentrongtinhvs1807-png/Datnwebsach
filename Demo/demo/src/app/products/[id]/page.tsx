@@ -1,61 +1,59 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "react-bootstrap";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-type Product = {
-  id: number;
-  ten_sp: string;
-  gia: number;
-  gia_km: number;
-  hinh: string;
-  mo_ta?: string;
-  tac_gia?: string;
-  book_type?: string;
-};
+interface Book {
+  sach_id: number;
+  ten_sach: string;
+  ten_tac_gia: string;
+  ten_NXB: string;
+  gia_sach: number;
+  ton_kho_sach: number;
+  mo_ta: string;
+  gg_sach: number;
+  loai_bia: string;
+  Loai_sach_id: number;
+  image?: string | null;
+}
 
-type Comment = {
+interface Comment {
   id: number;
-  productId: number;
+  bookId: number;
   user: string;
   content: string;
   createdAt: string;
-};
+}
 
-export default function ProductDetail() {
+export default function BookDetail() {
   const { id } = useParams() as { id: string };
-  const [product, setProduct] = useState<Product | null>(null);
+  const [book, setBook] = useState<Book | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentContent, setCommentContent] = useState("");
   const [user, setUser] = useState<{ id: number; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState(1);
 
-  // Lấy sản phẩm
+  // ✅ Lấy thông tin sách theo ID
   useEffect(() => {
-    fetch(`http://localhost:3003/products/${id}`)
+    fetch(`http://localhost:3003/books/${id}`)
       .then((res) => {
-        if (!res.ok) throw new Error("Không tìm thấy sản phẩm");
+        if (!res.ok) throw new Error("Không tìm thấy sách");
         return res.json();
       })
       .then((data) => {
-        setProduct({
-          id: Number(data.id) || 0,
-          ten_sp: data.name || "Sản phẩm không tên",
-          gia: Number(data.price) || 0,
-          gia_km: Number(data.originalPrice) || 0,
-          hinh: data.image || "/no-image.png",
-          mo_ta: data.description || "",
-          tac_gia: data.tac_gia || "Không rõ",
-          book_type: data.book_type || "Không rõ loại bìa",
-        });
+        console.log("📘 Chi tiết sách:", data);
+        setBook(data);
       })
-      .catch((err) => console.error("Lỗi tải sản phẩm:", err))
+      .catch((err) => console.error("❌ Lỗi tải sách:", err))
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Lấy user
+  // ✅ Lấy user đăng nhập
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -68,7 +66,7 @@ export default function ProductDetail() {
     }
   }, []);
 
-  // Lấy bình luận
+  // ✅ Lấy bình luận
   useEffect(() => {
     fetch(`http://localhost:3003/comments/${id}`)
       .then((res) => res.json())
@@ -76,35 +74,35 @@ export default function ProductDetail() {
       .catch((err) => console.error("Lỗi tải bình luận:", err));
   }, [id]);
 
-  // Thêm vào giỏ
+  // ✅ Thêm vào giỏ hàng
   const addToCart = () => {
-    if (!product) return;
-    let cart: any[] = JSON.parse(localStorage.getItem("cart") || "[]");
-    const existing = cart.find((item) => item.id === product.id);
+    if (!book) return;
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
 
+    const existing = cart.find((item: any) => item.id === book.sach_id);
     if (existing) {
-      existing.quantity = (existing.quantity || 1) + quantity;
+      existing.quantity += quantity;
     } else {
       cart.push({
-        id: product.id,
-        name: product.ten_sp,
-        price: product.gia_km > 0 ? product.gia_km : product.gia,
-        image: product.hinh,
-        book_type: product.book_type || "",
+        id: book.sach_id,
+        name: book.ten_sach,
+        price: book.gia_sach - (book.gg_sach || 0),
+        image: book.image,
         quantity,
+        loai_bia: book.loai_bia,
       });
     }
 
     localStorage.setItem("cart", JSON.stringify(cart));
-    alert(`✅ Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+    toast.success(`🛒 Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
   };
 
-  // Gửi bình luận
+  // ✅ Gửi bình luận
   const handleCommentSubmit = async () => {
     if (!commentContent.trim() || !user) return;
 
     const newComment = {
-      productId: Number(id),
+      bookId: Number(id),
       userId: user.id,
       content: commentContent.trim(),
     };
@@ -115,32 +113,36 @@ export default function ProductDetail() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newComment),
       });
+
       if (!res.ok) throw new Error("Lỗi khi gửi bình luận");
+
       const added = await res.json();
       setComments([added, ...comments]);
       setCommentContent("");
+      toast.success("💬 Bình luận của bạn đã được gửi!");
     } catch (error) {
       console.error(error);
-      alert("❌ Không gửi được bình luận");
+      toast.error("❌ Không gửi được bình luận");
     }
   };
 
-  if (loading) return <p className="text-center mt-4">⏳ Đang tải...</p>;
-  if (!product) return <p className="text-center mt-4">❌ Không tìm thấy sản phẩm</p>;
+  if (loading)
+    return <p className="text-center mt-4">⏳ Đang tải thông tin sách...</p>;
+  if (!book) return <p className="text-center mt-4">❌ Không tìm thấy sách</p>;
 
   return (
     <div className="container mt-4">
-      <Link href="/products" className="btn btn-outline-secondary mb-4">
-        ← Quay lại
+      <Link href="/home" className="btn btn-outline-secondary mb-4">
+        ← Quay lại danh sách
       </Link>
 
       <div className="row g-5">
-        {/* Ảnh */}
-        <div className="col-md-5 col-12 text-center">
+        {/* Ảnh sách */}
+        <div className="col-md-5 text-center">
           <div className="p-3 bg-white rounded shadow-sm">
             <img
-              src={product.hinh}
-              alt={product.ten_sp}
+              src={book.image || "/image/default-book.jpg"}
+              alt={book.ten_sach}
               className="img-fluid rounded"
               style={{
                 maxHeight: "420px",
@@ -160,52 +162,42 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Thông tin */}
-        <div className="col-md-7 col-12">
-          <h2 className="fw-bold">{product.ten_sp}</h2>
+        {/* Thông tin sách */}
+        <div className="col-md-7">
+          <h2 className="fw-bold mb-2">{book.ten_sach}</h2>
+          <p className="text-muted mb-1">✍️ Tác giả: {book.ten_tac_gia}</p>
+          <p className="text-muted mb-3">🏢 NXB: {book.ten_NXB}</p>
 
-          {product.gia_km > 0 ? (
-            <>
-              <p className="text-muted text-decoration-line-through mb-1">
-                {product.gia.toLocaleString()}đ
-              </p>
-              <p className="text-danger fs-3 fw-bold mb-1">
-                {product.gia_km.toLocaleString()}đ{" "}
-                {product.gia > 0 && (
+          <div className="mb-3">
+            {book.gg_sach > 0 ? (
+              <>
+                <p className="text-muted text-decoration-line-through mb-1">
+                  {book.gia_sach.toLocaleString("vi-VN")}đ
+                </p>
+                <p className="text-danger fs-3 fw-bold mb-1">
+                  {(book.gia_sach - book.gg_sach).toLocaleString("vi-VN")}đ{" "}
                   <Badge bg="success">
                     -
                     {Math.round(
-                      ((product.gia - product.gia_km) / product.gia) * 100
+                      (book.gg_sach / book.gia_sach) * 100
                     )}
                     %
                   </Badge>
-                )}
+                </p>
+                <p className="text-success fw-semibold">
+                  Tiết kiệm: {book.gg_sach.toLocaleString("vi-VN")}đ
+                </p>
+              </>
+            ) : (
+              <p className="text-danger fs-3 fw-bold">
+                {book.gia_sach.toLocaleString("vi-VN")}đ
               </p>
-              <p className="text-success fw-semibold">
-                Tiết kiệm:{" "}
-                {(product.gia - product.gia_km > 0
-                  ? product.gia - product.gia_km
-                  : 0
-                ).toLocaleString()}
-                đ
-              </p>
-            </>
-          ) : (
-            <p className="text-danger fs-3 fw-bold">
-              {product.gia.toLocaleString()}đ
-            </p>
-          )}
+            )}
+          </div>
 
-          <p className="mt-3">
-            {product.mo_ta || "📖 Chưa có mô tả cho sách này."}
-          </p>
+          <p className="text-muted">📖 Loại bìa: {book.loai_bia}</p>
 
-          <p className="mt-2 text-muted">✍️ Tác giả: {product.tac_gia}</p>
-
-          {/* Hiển thị loại bìa */}
-          {product.book_type && (
-            <p className="mt-1 text-muted">📖 Loại bìa: {product.book_type}</p>
-          )}
+          <p className="mt-3">{book.mo_ta || "Chưa có mô tả cho sách này."}</p>
 
           {/* Số lượng */}
           <div className="d-flex align-items-center mt-4 mb-4">
@@ -235,9 +227,8 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* Nút thêm giỏ */}
           <button
-            className="btn px-4 py-2 fw-bold w-100 w-md-auto"
+            className="btn px-4 py-2 fw-bold w-100"
             style={{
               borderRadius: "30px",
               background: "linear-gradient(45deg, #f1c40f, #f39c12)",
@@ -289,7 +280,7 @@ export default function ProductDetail() {
               <div>
                 <strong>{cmt.user}</strong>{" "}
                 <small className="text-muted">
-                  ({new Date(cmt.createdAt).toLocaleString()})
+                  ({new Date(cmt.createdAt).toLocaleString("vi-VN")})
                 </small>
                 <p className="mb-0 mt-2">{cmt.content}</p>
               </div>
@@ -298,7 +289,7 @@ export default function ProductDetail() {
         ))}
 
         {comments.length === 0 && (
-          <p className="text-muted">Chưa có bình luận nào cho sản phẩm này.</p>
+          <p className="text-muted">Chưa có bình luận nào cho sách này.</p>
         )}
       </div>
     </div>

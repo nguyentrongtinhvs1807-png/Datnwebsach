@@ -12,58 +12,47 @@ export default function LoginForm() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    let email = emailRef.current?.value || "";
-    let mat_khau = matkhauRef.current?.value || "";
+    const email = emailRef.current?.value.trim() || "";
+    const mat_khau = matkhauRef.current?.value.trim() || "";
 
-    if (email.trim() === "") {
-      if (thongbaoRef.current) thongbaoRef.current.innerHTML = "⚠️ Chưa nhập email";
-      emailRef.current?.focus();
+    if (!email || !mat_khau) {
+      if (thongbaoRef.current) thongbaoRef.current.innerHTML = "⚠️ Vui lòng nhập đầy đủ thông tin";
       return;
     }
 
     try {
-      let opt = {
+      const res = await fetch("http://localhost:3003/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, mat_khau }),
         headers: { "Content-Type": "application/json" },
-      };
+        body: JSON.stringify({ email, mat_khau }),
+      });
 
-      const res = await fetch("http://localhost:3003/auth/login", opt);
       const data = await res.json();
 
       if (!res.ok) {
-        if (thongbaoRef.current) thongbaoRef.current.innerHTML = `❌ Có lỗi: ${data.message}`;
+        if (thongbaoRef.current) thongbaoRef.current.innerHTML = `❌ ${data.message}`;
         return;
       }
 
-      if (thongbaoRef.current) thongbaoRef.current.innerHTML = data.message || "";
+      // ✅ Lưu thông tin đăng nhập
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.user.role);
 
-      if (data.user) {
-        // ✅ Lưu user, token, vai_tro
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("email", data.user.email);
-        if (data.token) {
-          localStorage.setItem("token", data.token);
-        }
+      // báo cho Header cập nhật
+      window.dispatchEvent(new Event("login"));
 
-        // báo cho Header cập nhật
-        window.dispatchEvent(new Event("login"));
-
-        // ✅ điều hướng
-        if (Number(data.user.vai_tro) === 1) {
-          router.push("/admin"); // admin dashboard
-        } else {
-          router.push("/home"); // user thường
-        }
+      // ✅ điều hướng theo vai trò
+      if (data.user.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/home");
       }
-    } catch (err: unknown) {
-      if (thongbaoRef.current) {
-        if (err instanceof Error) {
-          thongbaoRef.current.innerHTML = "❌ Có lỗi: " + err.message;
-        } else {
-          thongbaoRef.current.innerHTML = "❌ Có lỗi không xác định";
-        }
-      }
+
+      if (thongbaoRef.current) thongbaoRef.current.innerHTML = "✅ Đăng nhập thành công!";
+    } catch (error) {
+      if (thongbaoRef.current) thongbaoRef.current.innerHTML = "❌ Lỗi kết nối server";
+      console.error(error);
     }
   };
 
