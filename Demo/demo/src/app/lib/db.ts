@@ -5,7 +5,7 @@ export const pool = mysql.createPool({
   host: "localhost",       // hoặc 127.0.0.1
   user: "root",            // ✅ sửa theo tài khoản MySQL của anh
   password: "",            // ✅ thêm nếu có mật khẩu
-  database: "laptop_node", // ⚠️ Đặt đúng tên DB
+  database: "pibook_db", // ⚠️ Đặt đúng tên DB
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

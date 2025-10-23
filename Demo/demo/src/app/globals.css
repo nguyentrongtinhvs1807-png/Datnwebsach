@@ -148,3 +148,44 @@ footer a:hover {
   color: red !important; /* đỏ khi hover */
   text-decoration: underline; /* nếu muốn gạch chân */
 }
+
+/* Ẩn nút mũi tên tăng giảm trong input number */
+.quantity-input::-webkit-outer-spin-button,
+.quantity-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.quantity-input {
+  -moz-appearance: textfield; /* Firefox */
+  text-align: center;
+}
+
+/* Làm đẹp khung */
+.quantity-group .btn {
+  width: 40px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.quantity-group .btn:hover {
+  background-color: #ffc107;
+  color: #fff;
+}
+
+.quantity-group .form-control {
+  border-left: none;
+  border-right: none;
+  font-weight: 500;
+}
+
+.discount-card {
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  background: linear-gradient(145deg, #fffef8, #fff);
+}
+
+.discount-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(255, 193, 7, 0.3);
+}

@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 
 export default function DangKy() {
   const [form, setForm] = useState({
-    ten: '',
+    ho_ten: '',
     email: '',
-    sdt: '',
+    dien_thoai: '',
     mat_khau: '',
     nhap_lai_mat_khau: ''
   });
@@ -24,11 +24,11 @@ export default function DangKy() {
     setThongbao('');
 
     // 🔎 Kiểm tra hợp lệ
-    if (form.ten.trim().length < 3)
+    if (form.ho_ten.trim().length < 3)
       return setThongbao('❌ Họ tên phải có ít nhất 3 ký tự');
     if (!form.email.includes('@'))
       return setThongbao('❌ Email không hợp lệ');
-    if (form.sdt.trim().length < 9)
+    if (form.dien_thoai.trim().length < 9)
       return setThongbao('❌ Số điện thoại không hợp lệ');
     if (form.mat_khau.length < 6)
       return setThongbao('❌ Mật khẩu phải từ 6 ký tự trở lên');
@@ -43,20 +43,17 @@ export default function DangKy() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ten: form.ten,
+          ho_ten: form.ho_ten,
           email: form.email,
-          sdt: form.sdt,
-          mat_khau: form.mat_khau,
-          dia_chi: '',
-          ngay_sinh: '',
-          role: 'user'
+          dien_thoai: form.dien_thoai,
+          mat_khau: form.mat_khau
         })
       });
 
       const data = await res.json();
       setThongbao(data.message || '❌ Đăng ký thất bại');
 
-      if (res.status === 200) {
+      if (res.ok) {
         setThongbao('✅ Đăng ký thành công! Đang chuyển hướng...');
         setTimeout(() => router.push('/auth/dangnhap'), 1200);
       }
@@ -78,14 +75,14 @@ export default function DangKy() {
         </h2>
 
         {/* Input fields */}
-        {['ten', 'email', 'sdt', 'mat_khau', 'nhap_lai_mat_khau'].map((field) => (
+        {['ho_ten', 'email', 'dien_thoai', 'mat_khau', 'nhap_lai_mat_khau'].map((field) => (
           <div className="mb-4" key={field}>
             <label className="block text-sm font-medium mb-1 capitalize">
-              {field === 'ten'
+              {field === 'ho_ten'
                 ? 'Họ tên'
                 : field === 'email'
                 ? 'Email'
-                : field === 'sdt'
+                : field === 'dien_thoai'
                 ? 'Số điện thoại'
                 : field === 'mat_khau'
                 ? 'Mật khẩu'
@@ -98,11 +95,11 @@ export default function DangKy() {
               onChange={handleChange}
               className="w-full border rounded-md p-2 focus:ring-2 focus:ring-yellow-400 outline-none"
               placeholder={
-                field === 'ten'
+                field === 'ho_ten'
                   ? 'Nhập họ tên...'
                   : field === 'email'
                   ? 'Nhập email...'
-                  : field === 'sdt'
+                  : field === 'dien_thoai'
                   ? 'Nhập số điện thoại...'
                   : field === 'mat_khau'
                   ? 'Nhập mật khẩu...'

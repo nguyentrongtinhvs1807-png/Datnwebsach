@@ -4,5 +4,5 @@ export const pool = mysql.createPool({
   host: "localhost",
   user: "root",
   password: "", // đổi nếu có mật khẩu
-  database: "laptop_node",
+  database: "pibook_db",
 });

@@ -4,14 +4,16 @@ import { useEffect, useState } from "react";
 import { Table, Button, Form, Modal, Container } from "react-bootstrap";
 
 interface Voucher {
-  id?: number;
-  code: string;
-  discount: number;
-  min_order: number;
-  max_discount: number;
-  start_date: string;
-  end_date: string;
-  description?: string;
+  giam_gia_id?: number;
+  ma_gg: string;
+  loai_giam: "percent" | "fixed";
+  gia_tri_giam: number;
+  giam_toi_da: number;
+  don_toi_thieu: number;
+  ngay_bd: string;
+  ngay_kt: string;
+  gioi_han_sd: number;
+  trang_thai: number;
 }
 
 export default function AdminVoucherPage() {
@@ -19,24 +21,28 @@ export default function AdminVoucherPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
 
-  // Fetch danh sách voucher
+  // 🧾 Lấy danh sách voucher từ API Node.js
   const fetchVouchers = async () => {
-    const res = await fetch("/api/voucher");
-    const data = await res.json();
-    setVouchers(data);
+    try {
+      const res = await fetch("http://localhost:3003/voucher");
+      const data = await res.json();
+      setVouchers(data);
+    } catch (error) {
+      console.error("❌ Lỗi lấy danh sách voucher:", error);
+    }
   };
 
   useEffect(() => {
     fetchVouchers();
   }, []);
 
-  // Lưu voucher mới hoặc update
+  // 💾 Lưu hoặc cập nhật voucher
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const method = editingVoucher?.id ? "PUT" : "POST";
-    const url = editingVoucher?.id
-      ? `/api/voucher?id=${editingVoucher.id}`
-      : "/api/voucher";
+    const method = editingVoucher?.giam_gia_id ? "PUT" : "POST";
+    const url = editingVoucher?.giam_gia_id
+      ? `http://localhost:3003/voucher/${editingVoucher.giam_gia_id}`
+      : "http://localhost:3003/voucher";
 
     await fetch(url, {
       method,
@@ -49,54 +55,81 @@ export default function AdminVoucherPage() {
     fetchVouchers();
   };
 
-  // Xoá voucher
+  // 🗑️ Xoá voucher
   const handleDelete = async (id: number) => {
     if (confirm("Bạn có chắc chắn muốn xoá voucher này?")) {
-      await fetch(`/api/voucher?id=${id}`, { method: "DELETE" });
+      await fetch(`http://localhost:3003/voucher/${id}`, { method: "DELETE" });
       fetchVouchers();
     }
   };
 
   return (
     <Container className="py-5">
-      <h2 className="fw-bold mb-4 text-primary text-center">🎟️ Quản lý Voucher</h2>
+      <h2 className="fw-bold mb-4 text-primary text-center">
+        🎟️ Quản lý Mã Giảm Giá
+      </h2>
 
       <div className="text-end mb-3">
-        <Button onClick={() => { setEditingVoucher({
-          code: "",
-          discount: 0,
-          min_order: 0,
-          max_discount: 0,
-          start_date: "",
-          end_date: "",
-          description: ""
-        }); setShowModal(true); }}>+ Thêm Voucher</Button>
+        <Button
+          onClick={() => {
+            setEditingVoucher({
+              ma_gg: "",
+              loai_giam: "percent",
+              gia_tri_giam: 0,
+              giam_toi_da: 0,
+              don_toi_thieu: 0,
+              ngay_bd: "",
+              ngay_kt: "",
+              gioi_han_sd: 0,
+              trang_thai: 1,
+            });
+            setShowModal(true);
+          }}
+        >
+          + Thêm Mã Giảm Giá
+        </Button>
       </div>
 
       <Table bordered hover responsive>
-        <thead className="table-light">
+        <thead className="table-light text-center">
           <tr>
             <th>Mã</th>
-            <th>Giảm (%)</th>
-            <th>Đơn tối thiểu</th>
+            <th>Loại</th>
+            <th>Giá trị</th>
             <th>Giảm tối đa</th>
-            <th>Hiệu lực</th>
-            <th>Mô tả</th>
+            <th>Đơn tối thiểu</th>
+            <th>Giới hạn SD</th>
+            <th>Ngày hiệu lực</th>
+            <th>Trạng thái</th>
             <th>Hành động</th>
           </tr>
         </thead>
         <tbody>
           {vouchers.map((v) => (
-            <tr key={v.id}>
-              <td><strong>{v.code}</strong></td>
-              <td>{v.discount}%</td>
-              <td>{v.min_order.toLocaleString()}đ</td>
-              <td>{v.max_discount.toLocaleString()}đ</td>
+            <tr key={v.giam_gia_id}>
               <td>
-                {new Date(v.start_date).toLocaleDateString("vi-VN")} →{" "}
-                {new Date(v.end_date).toLocaleDateString("vi-VN")}
+                <strong>{v.ma_gg}</strong>
               </td>
-              <td>{v.description || "-"}</td>
+              <td>{v.loai_giam === "percent" ? "Phần trăm" : "Cố định"}</td>
+              <td>
+                {v.loai_giam === "percent"
+                  ? `${v.gia_tri_giam}%`
+                  : `${v.gia_tri_giam.toLocaleString()}đ`}
+              </td>
+              <td>{v.giam_toi_da.toLocaleString()}đ</td>
+              <td>{v.don_toi_thieu.toLocaleString()}đ</td>
+              <td>{v.gioi_han_sd}</td>
+              <td>
+                {new Date(v.ngay_bd).toLocaleDateString("vi-VN")} →{" "}
+                {new Date(v.ngay_kt).toLocaleDateString("vi-VN")}
+              </td>
+              <td>
+                {v.trang_thai === 1 ? (
+                  <span className="text-success fw-semibold">Hoạt động</span>
+                ) : (
+                  <span className="text-danger fw-semibold">Ngừng</span>
+                )}
+              </td>
               <td className="text-center">
                 <Button
                   size="sm"
@@ -112,7 +145,7 @@ export default function AdminVoucherPage() {
                 <Button
                   size="sm"
                   variant="outline-danger"
-                  onClick={() => handleDelete(v.id!)}
+                  onClick={() => handleDelete(v.giam_gia_id!)}
                 >
                   Xoá
                 </Button>
@@ -122,49 +155,55 @@ export default function AdminVoucherPage() {
         </tbody>
       </Table>
 
-      {/* Modal thêm/sửa */}
+      {/* 🧩 Modal Thêm/Sửa Voucher */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>{editingVoucher?.id ? "Chỉnh sửa Voucher" : "Thêm Voucher mới"}</Modal.Title>
+          <Modal.Title>
+            {editingVoucher?.giam_gia_id
+              ? "✏️ Chỉnh sửa Voucher"
+              : "➕ Thêm Voucher mới"}
+          </Modal.Title>
         </Modal.Header>
+
         <Form onSubmit={handleSave}>
           <Modal.Body>
             <Form.Group className="mb-3">
-              <Form.Label>Mã Voucher</Form.Label>
+              <Form.Label>Mã Giảm Giá</Form.Label>
               <Form.Control
                 type="text"
-                value={editingVoucher?.code || ""}
+                value={editingVoucher?.ma_gg || ""}
                 onChange={(e) =>
-                  setEditingVoucher({ ...editingVoucher!, code: e.target.value })
+                  setEditingVoucher({ ...editingVoucher!, ma_gg: e.target.value })
                 }
                 required
               />
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>Giảm (%)</Form.Label>
-              <Form.Control
-                type="number"
-                value={editingVoucher?.discount || 0}
+              <Form.Label>Loại giảm</Form.Label>
+              <Form.Select
+                value={editingVoucher?.loai_giam || "percent"}
                 onChange={(e) =>
                   setEditingVoucher({
                     ...editingVoucher!,
-                    discount: Number(e.target.value),
+                    loai_giam: e.target.value as "percent" | "fixed",
                   })
                 }
-                required
-              />
+              >
+                <option value="percent">Phần trăm (%)</option>
+                <option value="fixed">Cố định (VNĐ)</option>
+              </Form.Select>
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>Đơn tối thiểu</Form.Label>
+              <Form.Label>Giá trị giảm</Form.Label>
               <Form.Control
                 type="number"
-                value={editingVoucher?.min_order || 0}
+                value={editingVoucher?.gia_tri_giam || 0}
                 onChange={(e) =>
                   setEditingVoucher({
                     ...editingVoucher!,
-                    min_order: Number(e.target.value),
+                    gia_tri_giam: Number(e.target.value),
                   })
                 }
               />
@@ -174,11 +213,39 @@ export default function AdminVoucherPage() {
               <Form.Label>Giảm tối đa</Form.Label>
               <Form.Control
                 type="number"
-                value={editingVoucher?.max_discount || 0}
+                value={editingVoucher?.giam_toi_da || 0}
                 onChange={(e) =>
                   setEditingVoucher({
                     ...editingVoucher!,
-                    max_discount: Number(e.target.value),
+                    giam_toi_da: Number(e.target.value),
+                  })
+                }
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Đơn tối thiểu</Form.Label>
+              <Form.Control
+                type="number"
+                value={editingVoucher?.don_toi_thieu || 0}
+                onChange={(e) =>
+                  setEditingVoucher({
+                    ...editingVoucher!,
+                    don_toi_thieu: Number(e.target.value),
+                  })
+                }
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Giới hạn sử dụng</Form.Label>
+              <Form.Control
+                type="number"
+                value={editingVoucher?.gioi_han_sd || 0}
+                onChange={(e) =>
+                  setEditingVoucher({
+                    ...editingVoucher!,
+                    gioi_han_sd: Number(e.target.value),
                   })
                 }
               />
@@ -188,11 +255,11 @@ export default function AdminVoucherPage() {
               <Form.Label>Ngày bắt đầu</Form.Label>
               <Form.Control
                 type="date"
-                value={editingVoucher?.start_date?.split("T")[0] || ""}
+                value={editingVoucher?.ngay_bd?.split("T")[0] || ""}
                 onChange={(e) =>
                   setEditingVoucher({
                     ...editingVoucher!,
-                    start_date: e.target.value,
+                    ngay_bd: e.target.value,
                   })
                 }
               />
@@ -202,31 +269,33 @@ export default function AdminVoucherPage() {
               <Form.Label>Ngày kết thúc</Form.Label>
               <Form.Control
                 type="date"
-                value={editingVoucher?.end_date?.split("T")[0] || ""}
+                value={editingVoucher?.ngay_kt?.split("T")[0] || ""}
                 onChange={(e) =>
                   setEditingVoucher({
                     ...editingVoucher!,
-                    end_date: e.target.value,
+                    ngay_kt: e.target.value,
                   })
                 }
               />
             </Form.Group>
 
-            <Form.Group>
-              <Form.Label>Mô tả</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={editingVoucher?.description || ""}
+            <Form.Group className="mb-3">
+              <Form.Label>Trạng thái</Form.Label>
+              <Form.Select
+                value={editingVoucher?.trang_thai || 1}
                 onChange={(e) =>
                   setEditingVoucher({
                     ...editingVoucher!,
-                    description: e.target.value,
+                    trang_thai: Number(e.target.value),
                   })
                 }
-              />
+              >
+                <option value={1}>Hoạt động</option>
+                <option value={0}>Ngừng</option>
+              </Form.Select>
             </Form.Group>
           </Modal.Body>
+
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowModal(false)}>
               Huỷ

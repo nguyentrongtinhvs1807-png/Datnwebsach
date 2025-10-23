@@ -38,6 +38,11 @@ export default function BookDetail() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
 
+  // 🖼️ Ảnh chính hiển thị
+  const [mainImage, setMainImage] = useState<string>("");
+  // 🖼️ Danh sách ảnh phụ
+  const [images, setImages] = useState<string[]>([]);
+
   // ✅ Lấy thông tin sách theo ID
   useEffect(() => {
     fetch(`http://localhost:3003/books/${id}`)
@@ -48,9 +53,23 @@ export default function BookDetail() {
       .then((data) => {
         console.log("📘 Chi tiết sách:", data);
         setBook(data);
+        setMainImage(data.image || "/image/default-book.jpg");
       })
       .catch((err) => console.error("❌ Lỗi tải sách:", err))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  // ✅ Lấy danh sách ảnh phụ của sách
+  useEffect(() => {
+    fetch(`http://localhost:3003/books/${id}/images`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const imgs = data.map((item: any) => item.URL);
+          setImages(imgs);
+        }
+      })
+      .catch((err) => console.error("❌ Lỗi tải hình ảnh:", err));
   }, [id]);
 
   // ✅ Lấy user đăng nhập
@@ -87,7 +106,7 @@ export default function BookDetail() {
         id: book.sach_id,
         name: book.ten_sach,
         price: book.gia_sach - (book.gg_sach || 0),
-        image: book.image,
+        image: mainImage,
         quantity,
         loai_bia: book.loai_bia,
       });
@@ -130,6 +149,9 @@ export default function BookDetail() {
     return <p className="text-center mt-4">⏳ Đang tải thông tin sách...</p>;
   if (!book) return <p className="text-center mt-4">❌ Không tìm thấy sách</p>;
 
+  // 🖼️ Danh sách ảnh hiển thị (nếu không có thì dùng ảnh chính)
+  const thumbnails = images.length > 0 ? images : [book.image || "/image/default-book.jpg"];
+
   return (
     <div className="container mt-4">
       <Link href="/home" className="btn btn-outline-secondary mb-4">
@@ -138,10 +160,35 @@ export default function BookDetail() {
 
       <div className="row g-5">
         {/* Ảnh sách */}
-        <div className="col-md-5 text-center">
-          <div className="p-3 bg-white rounded shadow-sm">
+        <div className="col-md-5 text-center d-flex">
+          {/* Ảnh nhỏ bên trái */}
+          <div className="d-flex flex-column gap-2 me-3">
+            {thumbnails.map((img, index) => (
+              <img
+                key={index}
+                src={img}
+                alt={`Ảnh ${index + 1}`}
+                className="img-thumbnail"
+                style={{
+                  width: "80px",
+                  height: "100px",
+                  objectFit: "cover",
+                  cursor: "pointer",
+                  border:
+                    img === mainImage
+                      ? "2px solid #f39c12"
+                      : "1px solid #ddd",
+                  transition: "0.2s",
+                }}
+                onClick={() => setMainImage(img)}
+              />
+            ))}
+          </div>
+
+          {/* Ảnh chính */}
+          <div className="flex-grow-1 p-3 bg-white rounded shadow-sm">
             <img
-              src={book.image || "/image/default-book.jpg"}
+              src={mainImage}
               alt={book.ten_sach}
               className="img-fluid rounded"
               style={{
@@ -178,10 +225,7 @@ export default function BookDetail() {
                   {(book.gia_sach - book.gg_sach).toLocaleString("vi-VN")}đ{" "}
                   <Badge bg="success">
                     -
-                    {Math.round(
-                      (book.gg_sach / book.gia_sach) * 100
-                    )}
-                    %
+                    {Math.round((book.gg_sach / book.gia_sach) * 100)}%
                   </Badge>
                 </p>
                 <p className="text-success fw-semibold">
@@ -202,7 +246,10 @@ export default function BookDetail() {
           {/* Số lượng */}
           <div className="d-flex align-items-center mt-4 mb-4">
             <label className="me-3 fw-semibold">Số lượng:</label>
-            <div className="input-group" style={{ maxWidth: "160px" }}>
+            <div
+              className="input-group quantity-group"
+              style={{ maxWidth: "160px" }}
+            >
               <button
                 className="btn btn-outline-secondary"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
@@ -216,7 +263,7 @@ export default function BookDetail() {
                 onChange={(e) =>
                   setQuantity(Math.max(1, Number(e.target.value) || 1))
                 }
-                className="form-control text-center"
+                className="form-control text-center quantity-input"
               />
               <button
                 className="btn btn-outline-secondary"

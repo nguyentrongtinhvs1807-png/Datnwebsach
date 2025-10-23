@@ -19,20 +19,37 @@ interface Book {
   gg_sach: number;
   loai_bia: string;
   Loai_sach_id: number;
-  image?: string; // ✅ thêm để nhận URL ảnh
+  image?: string;
+}
+
+interface Category {
+  loai_sach_id: number;
+  ten_loai: string;
+}
+
+interface Discount {
+  ma_gg: string;
+  loai_giam: string;
+  gia_tri_giam: number;
+  giam_toi_da: number;
+  don_toi_thieu: number;
+  ngay_bd: string;
+  ngay_kt: string;
 }
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [keyword, setKeyword] = useState("");
   const router = useRouter();
 
-  // ✅ Import Bootstrap JS khi mount
+  //  Import Bootstrap JS
   useEffect(() => {
     import("bootstrap/dist/js/bootstrap.bundle.min.js");
   }, []);
 
-  // ✅ Lấy dữ liệu từ API server.js
+  //  Lấy danh sách sách
   useEffect(() => {
     fetch("http://localhost:3003/books")
       .then((res) => res.json())
@@ -40,7 +57,23 @@ export default function Home() {
       .catch(() => setBooks([]));
   }, []);
 
-  // ✅ Lọc theo từ khóa
+  //  Lấy danh mục
+  useEffect(() => {
+    fetch("http://localhost:3003/categories")
+      .then((res) => res.json())
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch(() => setCategories([]));
+  }, []);
+
+  //  Lấy mã giảm giá
+  useEffect(() => {
+    fetch("http://localhost:3003/api/ma-giam-gia")
+      .then((res) => res.json())
+      .then((data) => setDiscounts(Array.isArray(data) ? data : []))
+      .catch(() => setDiscounts([]));
+  }, []);
+
+  //  Lọc theo từ khóa
   const filteredBooks = books.filter((b) =>
     b.ten_sach?.toLowerCase().includes(keyword.toLowerCase())
   );
@@ -59,7 +92,7 @@ export default function Home() {
             <Col xs={6} sm={4} md={3} className="d-flex align-items-center">
               <Link href="/" className="d-flex align-items-center text-decoration-none">
                 <img
-                  src="/image/z7124556721378_d0b1e93464381adf72fe03e78d1e91ba.jpg"
+                  src="/image/Grace.png"
                   alt="Logo"
                   style={{ height: "90px", width: "90px" }}
                   className="rounded-circle shadow-sm"
@@ -148,84 +181,7 @@ export default function Home() {
           </Col>
         </Row>
       </Container>
-
       <Container fluid className="mt-3">
-        <Row className="gx-3">
-          {/* Sidebar (2 banner nhỏ dọc) */}
-          <Col xs={12} md={3} className="mb-3">
-            <div className="d-flex flex-column gap-3">
-              <div className="shadow-sm rounded overflow-hidden banner-small">
-                <img
-                  src="/image/abc.jpg"
-                  alt="Banner nhỏ 1"
-                  className="w-100 rounded"
-                  style={{
-                    objectFit: "cover",
-                    height: "190px",
-                    borderRadius: "12px",
-                    transition: "transform 0.3s ease",
-                  }}
-                />
-              </div>
-              <div className="shadow-sm rounded overflow-hidden banner-small">
-                <img
-                  src="/image/abcd.jpg"
-                  alt="Banner nhỏ 2"
-                  className="w-100 rounded"
-                  style={{
-                    objectFit: "cover",
-                    height: "190px",
-                    borderRadius: "12px",
-                    transition: "transform 0.3s ease",
-                  }}
-                />
-              </div>
-            </div>
-          </Col>
-
-          {/* Banner chính (carousel) */}
-          <Col xs={12} md={9} className="mb-3">
-            <div
-              className="rounded shadow overflow-hidden banner"
-              style={{ height: "395px" }}
-            >
-              <div
-                id="mainBanner"
-                className="carousel slide h-100"
-                data-bs-ride="carousel"
-                data-bs-interval="3000"
-              >
-                <div className="carousel-inner h-100">
-                  <div className="carousel-item active h-100">
-                    <img
-                      src="/image/b9690ac7ec4b7c94d44d9e519b6c30e7.jpg"
-                      className="d-block w-100 h-100 banner-img"
-                      alt="Banner 1"
-                      style={{ objectFit: "cover" }}
-                    />
-                  </div>
-                  <div className="carousel-item h-100">
-                    <img
-                      src="/image/0f342e41bb8009c013ee9435f249b3d7.jpg"
-                      className="d-block w-100 h-100 banner-img"
-                      alt="Banner 2"
-                      style={{ objectFit: "cover" }}
-                    />
-                  </div>
-                  <div className="carousel-item h-100">
-                    <img
-                      src="/image/abcde.jpg"
-                      className="d-block w-100 h-100 banner-img"
-                      alt="Banner 3"
-                      style={{ objectFit: "cover" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
         {/* === 4 Banner nhỏ ngang phía dưới === */}
         <Row className="mt-3 gx-3">
           {[
@@ -251,14 +207,6 @@ export default function Home() {
             </Col>
           ))}
         </Row>
-
-        <style jsx>{`
-          .banner-small img:hover,
-          .banner-small-horizontal img:hover {
-            transform: scale(1.05);
-          }
-        `}</style>
-
         {/* === 2 banner ngang to phía dưới === */}
         <Row className="mt-3 g-3">
           {["banner-ngang-1.jpg", "banner-ngang-2.jpg"].map((b, i) => (
@@ -279,104 +227,255 @@ export default function Home() {
           ))}
         </Row>
       </Container>
+      
+      {/* ✅ Danh mục */}
+      <Container className="mt-5">
+        {categories.length > 0 ? (
+          <Row className="justify-content-center text-center g-4">
+            {categories.map((cat) => {
+              let iconClass = "bi-book";
+              switch (cat.ten_loai) {
+                case "Văn học Việt Nam":
+                  iconClass = "bi-journal-bookmark-fill";
+                  break;
+                case "Văn học nước ngoài":
+                  iconClass = "bi-globe2";
+                  break;
+                case "Kỹ năng sống":
+                  iconClass = "bi-lightbulb-fill";
+                  break;
+                case "Thiếu nhi":
+                  iconClass = "bi-balloon-heart-fill";
+                  break;
+                case "Truyện tranh":
+                  iconClass = "bi-emoji-smile-fill";
+                  break;
+              }
+
+              return (
+                <Col
+                  key={cat.loai_sach_id}
+                  xs={6}
+                  sm={4}
+                  md={3}
+                  lg={2}
+                  className="d-flex justify-content-center"
+                >
+                  <div
+                    onClick={() => router.push(`/category/${cat.loai_sach_id}`)}
+                    className="category-card shadow-sm bg-white rounded-4 p-4 w-100 text-center fw-semibold text-dark"
+                    style={{
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                      border: "2px solid #f1f1f1",
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = "scale(1.07)";
+                      e.currentTarget.style.boxShadow = "0 8px 20px rgba(255,193,7,0.4)";
+                      e.currentTarget.style.borderColor = "#ffc107";
+                      const icon = e.currentTarget.querySelector("i");
+                      if (icon) icon.style.color = "#ffc107";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.05)";
+                      e.currentTarget.style.borderColor = "#f1f1f1";
+                      const icon = e.currentTarget.querySelector("i");
+                      if (icon) icon.style.color = "#333";
+                    }}
+                  >
+                    <i
+                      className={`bi ${iconClass} mb-3`}
+                      style={{ fontSize: "2.8rem", color: "#333", transition: "color 0.3s ease" }}
+                    ></i>
+                    <div className="text-truncate">{cat.ten_loai}</div>
+                  </div>
+                </Col>
+              );
+            })}
+          </Row>
+        ) : (
+          <p className="text-center text-muted">Không có danh mục nào để hiển thị.</p>
+        )}
+      </Container>
 
 
-      {/* ================ Danh mục ================ */}
-      <Container className="mt-4">
-        <Row className="justify-content-center text-center g-2">
-          {[
-            { src: "https://nhasachphuongnam.com/images/promo/274/lego.png", label: "Lego", id: 1 },
-            { src: "https://nhasachphuongnam.com/images/promo/274/puzzlr.png", label: "Jigsaw/Puzzle", id: 2 },
-            { src: "https://nhasachphuongnam.com/images/promo/274/manga.png", label: "Manga", id: 3 },
-            { src: "https://nhasachphuongnam.com/images/promo/274/gift.png", label: "Gift Books For You", id: 4 },
-            { src: "https://nhasachphuongnam.com/images/promo/274/teen.png", label: "Tiệc Sách Tuổi Teen", id: 5 },
-            { src: "https://nhasachphuongnam.com/images/promo/274/s%C3%A1ch_c%C5%A9.png", label: "Phiên Chợ Sách Cũ", id: 6 },
-          ].map((cat, index) => (
+      {/* ✅ ================ MÃ GIẢM GIÁ ================ */}
+      <Container className="mt-5 mb-5">
+        <h2 className="section-title mb-4 text-center">🎟️ Mã Giảm Giá Hấp Dẫn</h2>
+
+        {discounts.length > 0 ? (
+          <Row className="g-4 justify-content-center">
+            {discounts.map((d, i) => (
+              <Col key={i} xs={12} sm={6} md={4} lg={3}>
+                <Card className="shadow-lg border-0 h-100 discount-card">
+                  <Card.Body className="text-center d-flex flex-column justify-content-between">
+                    <div>
+                      <h5 className="fw-bold text-warning mb-2">{d.ma_gg}</h5>
+                      <p className="text-muted mb-1">
+                        {d.loai_giam === "percent"
+                          ? `Giảm ${d.gia_tri_giam}% (Tối đa ${Number(
+                              d.giam_toi_da
+                            ).toLocaleString("vi-VN")}đ)`
+                          : `Giảm ${Number(d.gia_tri_giam).toLocaleString("vi-VN")}đ`}
+                      </p>
+                      <p className="text-muted small mb-2">
+                        Đơn tối thiểu:{" "}
+                        <span className="fw-semibold">
+                          {Number(d.don_toi_thieu).toLocaleString("vi-VN")}đ
+                        </span>
+                      </p>
+                      <p className="text-secondary small mb-2">
+                        HSD: {new Date(d.ngay_kt).toLocaleDateString("vi-VN")}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Button
+                        variant="warning"
+                        className="mt-2 fw-semibold"
+                        onClick={() => {
+                          navigator.clipboard.writeText(d.ma_gg);
+                          alert(`🎉 Đã sao chép mã: ${d.ma_gg}`);
+                        }}
+                      >
+                        Sao chép mã
+                      </Button>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <p className="text-center text-muted">Hiện chưa có mã giảm giá nào.</p>
+        )}
+      </Container>
+      
+      {/* ✅ Danh sách sách */}
+<Container className="mt-5">
+  <h2 className="section-title mb-4">Sách Mới</h2>
+
+  {/* ⚡ Lọc bỏ sách trùng nhau theo sach_id */}
+  {(() => {
+    const uniqueBooks: any[] = [];
+    const seen = new Set();
+
+    for (const book of filteredBooks) {
+      if (!seen.has(book.sach_id)) {
+        seen.add(book.sach_id);
+        uniqueBooks.push(book);
+      }
+    }
+
+    return (
+      <Row>
+        {uniqueBooks.length > 0 ? (
+          uniqueBooks.slice(0, 12).map((book) => (
             <Col
-              key={index}
+              key={book.sach_id}
               xs={6}
-              sm={4}
-              md={3}
-              lg={2}
-              className="d-flex flex-column align-items-center mb-3"
-              style={{ padding: "4px" }}
+              sm={6}
+              md={4}
+              lg={3}
+              className="mb-4"
             >
-              <Link
-                href={`/category/${cat.id}`}
-                className="text-decoration-none text-dark"
-                style={{ transition: "transform 0.25s ease" }}
+              <Card
+                className="product-card h-100 shadow-sm"
+                style={{ cursor: "pointer" }}
+                onClick={() => router.push(`/products/${book.sach_id}`)}
               >
-                <div className="d-flex justify-content-center align-items-center" style={{ width: "130px", height: "130px" }}>
-                  <img src={cat.src} alt={cat.label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                </div>
-                <small className="mt-2 fw-semibold d-block">{cat.label}</small>
-              </Link>
+                <Card.Img
+                  variant="top"
+                  src={book.image || "/image/default-book.jpg"}
+                  alt={book.ten_sach}
+                  className="p-2"
+                  style={{
+                    height: "230px",
+                    objectFit: "contain",
+                    borderRadius: "10px",
+                  }}
+                />
+                <Card.Body className="text-center">
+                  <Card.Title className="fw-bold mb-1 text-danger">
+                    {book.ten_sach}
+                  </Card.Title>
+                  <Card.Text className="text-success mb-1">
+                    {book.ten_tac_gia}
+                  </Card.Text>
+                  <Card.Text className="text-primary mb-1">
+                    Loại bìa: {book.loai_bia}
+                  </Card.Text>
+                  <h6 className="text-danger">{formatPrice(book.gia_sach)}</h6>
+                  <Button
+                    variant="warning"
+                    className="w-100 mt-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/products/${book.sach_id}`);
+                    }}
+                  >
+                    Xem chi tiết
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
+          ))
+        ) : (
+          <p className="text-center">Không có sách nào để hiển thị</p>
+        )}
+      </Row>
+    );
+  })()}
+</Container>
+
+
+      <AboutBookbuy />
+      {/* ================ News Section ================ */}
+      <Container className="mt-5">
+        <h2 className="section-title">📰 Tin Tức & Blog</h2>
+        <Row>
+          {[
+            {
+              id: 1,
+              title: "LMHT: Top 5 tuyển thủ Đường Giữa tại CKTG 2022",
+              image: "/image/Tong-quan-20.jpg",
+              desc: "Danh sách những cuốn sách hay, được nhiều độc giả bình chọn.",
+            },
+            {
+              id: 2,
+              title: "Lịch thi đấu Chung kết thế giới LMHT 2025",
+              image:
+                "/image/ket-qua-chung-ket-the-gioi-2_b474288dc1154ec0834cc89aa1f966eb_1024x1024.jpg",
+              desc: "Khám phá cách sử dụng bảng vẽ để học tập sáng tạo hơn.",
+            },
+            {
+              id: 3,
+              title: "Bắt cóc con nít người chơi Yasuo xuất sắc nhất",
+              image: "/image/1735121535_Yasuonhba.png",
+              desc: "Khuyến khích sinh viên đọc sách mỗi ngày để nâng cao kiến thức.",
+            },
+          ].map((news) => (
+            <Col key={news.id} xs={12} md={4} className="mb-4">
+              <Card className="h-100 shadow-sm">
+                <Card.Img
+                  variant="top"
+                  src={news.image}
+                  alt={news.title}
+                  style={{ height: "200px", objectFit: "cover" }}
+                />
+                <Card.Body>
+                  <Card.Title>{news.title}</Card.Title>
+                  <Card.Text>{news.desc}</Card.Text>
+                  <Button variant="link" className="p-0 text-warning">
+                    Đọc tiếp →
+                  </Button>
+                </Card.Body>
+              </Card>
             </Col>
           ))}
         </Row>
       </Container>
-
-      {/* ================ Danh sách Sách ================ */}
-      <Container className="mt-5">
-        <h2 className="section-title">📚 Danh Sách Sách</h2>
-        <Row>
-          {filteredBooks.length > 0 ? (
-            filteredBooks.map((book) => (
-              <Col key={book.sach_id} xs={6} sm={6} md={4} lg={3} className="mb-4">
-                <Card className="product-card h-100 shadow-sm">
-                  <Card.Img
-                    variant="top"
-                    src={
-                      book.image && book.image.trim() !== ""
-                        ? book.image
-                        : "/image/default-book.jpg"
-                    }
-                    alt={book.ten_sach}
-                    className="p-3"
-                    style={{
-                      height: "250px",
-                      objectFit: "contain",
-                      borderRadius: "10px",
-                    }}
-                  />
-
-                  <Card.Body className="d-flex flex-column align-items-center justify-content-between">
-                    <div className="text-center w-100">
-                      <Card.Title className="text-truncate fw-bold">
-                        {book.ten_sach}
-                      </Card.Title>
-
-                      <Card.Text className="text-success fw-semibold">
-                        {book.ten_tac_gia}
-                      </Card.Text>
-
-                      <Card.Text className="text-primary">
-                        Loại bìa: {book.loai_bia}
-                      </Card.Text>
-
-                      <h5 className="text-danger mb-0">
-                        {formatPrice(book.gia_sach)}
-                      </h5>
-                    </div>
-
-                    <Button
-                      variant="warning"
-                      className="w-100 mt-3"
-                      onClick={() => router.push(`/products/${book.sach_id}`)}
-                    >
-                      Xem chi tiết
-                    </Button>
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))
-          ) : (
-            <p className="text-center">Không có sách nào để hiển thị</p>
-          )}
-        </Row>
-      </Container>
-
-      <AboutBookbuy />
     </>
   );
 }

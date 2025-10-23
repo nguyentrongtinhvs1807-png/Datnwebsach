@@ -1,147 +1,224 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";  // 👈 thêm useParams
+import { useRouter, useParams } from "next/navigation";
+import { Spinner, Form, Button, Card } from "react-bootstrap";
 
-interface Product {
-  id: number;
-  name: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  description: string;
-  hot?: number;
+interface Sach {
+  sach_id: number;
+  ten_sach: string;
+  ten_tac_gia: string;
+  ten_NXB: string;
+  gia_sach: number;
+  ton_kho_sach: number;
+  mo_ta: string;
+  gg_sach: number;
+  loai_bia: string;
 }
 
-export default function EditProductClient() {
+export default function EditSachPage() {
   const router = useRouter();
-  const params = useParams();             // 👈 lấy params từ URL
-  const id = params?.id as string;        // 👈 ép kiểu string
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  const params = useParams();
+  const id = params?.id as string;
 
-  console.log("🌍 process.env.NEXT_PUBLIC_API_URL:", API_URL);
-  console.log("🆔 ID từ URL:", id);
-
-  const [product, setProduct] = useState<Product | null>(null);
+  const [sach, setSach] = useState<Sach | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
+  // ✅ Lấy dữ liệu sách theo ID
   useEffect(() => {
-    if (!id) {
-      console.log("⚠️ Không có id");
-      return;
-    }
+    if (!id) return;
 
-    const url = `${API_URL}/products/${id}`;
-    console.log("🔎 Gọi API:", url);
-
-    fetch(url)
+    fetch(`http://localhost:3003/sachs/${id}`)
       .then((res) => {
-        console.log("📡 Response status:", res.status);
-        if (!res.ok) throw new Error("Không tìm thấy sản phẩm");
+        if (!res.ok) throw new Error("Không tìm thấy sách");
         return res.json();
       })
-      .then((data) => {
-        console.log("📦 Dữ liệu sản phẩm:", data);
-        setProduct({
-          id: data.id || data.id_sp,
-          name: data.ten_sp || data.name,
-          price: data.gia || data.price,
-          originalPrice: data.gia_km || data.originalPrice,
-          image: data.hinh || data.image,
-          description: data.mo_ta || data.description,
-          hot: data.hot,
-        });
-      })
+      .then((data) => setSach(data))
       .catch((err) => {
-        console.error("❌ Lỗi khi fetch sản phẩm:", err);
+        console.error("❌ Lỗi fetch:", err);
+        alert("Không thể tải thông tin sách!");
         router.push("/admin/products");
       })
       .finally(() => setLoading(false));
-  }, [id, API_URL, router]);
+  }, [id, router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (!product) return;
-    setProduct({ ...product, [e.target.name]: e.target.value });
+  // ✅ Cập nhật state khi người dùng thay đổi input
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    if (!sach) return;
+    setSach({ ...sach, [e.target.name]: e.target.value });
   };
 
+  // ✅ Gửi PUT để lưu thay đổi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!product) return;
+    if (!sach) return;
 
+    setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/products/${product.id}`, {
+      const res = await fetch(`http://localhost:3003/sachs/${sach.sach_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(product),
+        body: JSON.stringify(sach),
       });
 
-      if (!res.ok) throw new Error("Cập nhật thất bại");
-
-      alert("✅ Sửa sản phẩm thành công!");
+      if (!res.ok) throw new Error("Cập nhật thất bại!");
+      alert("✅ Cập nhật sách thành công!");
       router.push("/admin/products");
-    } catch (error) {
-      console.error(error);
-      alert("❌ Có lỗi xảy ra khi cập nhật sản phẩm!");
+    } catch (err) {
+      console.error("❌", err);
+      alert("Đã xảy ra lỗi khi cập nhật sách!");
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loading) return <p className="text-center p-4">⏳ Đang tải...</p>;
-  if (!product) return <p className="text-center p-4">❌ Không tìm thấy sản phẩm</p>;
+  if (loading)
+    return (
+      <div className="text-center mt-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2 text-secondary">Đang tải thông tin sách...</p>
+      </div>
+    );
+
+  if (!sach)
+    return (
+      <p className="text-center mt-5 text-muted">
+        ❌ Không tìm thấy thông tin sách.
+      </p>
+    );
 
   return (
-    <div className="max-w-2xl mx-auto bg-white shadow-lg p-6 rounded-xl">
-      <h1 className="text-2xl font-bold mb-4">✏️ Chỉnh sửa sản phẩm</h1>
+    <div className="min-h-screen bg-light py-5">
+      <div className="container">
+        <Card className="shadow-lg border-0 rounded-4 p-4 mx-auto" style={{ maxWidth: "700px" }}>
+          <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+            <h3 className="fw-bold text-primary m-0">
+              ✏️ Cập nhật thông tin sách
+            </h3>
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => router.push("/admin/products")}
+            >
+              ← Quay lại
+            </Button>
+          </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          name="name"
-          value={product.name}
-          onChange={handleChange}
-          placeholder="Tên sản phẩm"
-          className="w-full p-2 border rounded"
-          required
-        />
-        <input
-          type="number"
-          name="price"
-          value={product.price}
-          onChange={handleChange}
-          placeholder="Giá"
-          className="w-full p-2 border rounded"
-          required
-        />
-        <input
-          type="number"
-          name="originalPrice"
-          value={product.originalPrice ?? ""}
-          onChange={handleChange}
-          placeholder="Giá khuyến mãi"
-          className="w-full p-2 border rounded"
-        />
-        <input
-          type="text"
-          name="image"
-          value={product.image}
-          onChange={handleChange}
-          placeholder="Link hình ảnh"
-          className="w-full p-2 border rounded"
-        />
-        <textarea
-          name="description"
-          value={product.description}
-          onChange={handleChange}
-          placeholder="Mô tả sản phẩm"
-          className="w-full p-2 border rounded"
-          rows={4}
-        />
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-        >
-          Lưu thay đổi
-        </button>
-      </form>
+          <Form onSubmit={handleSubmit} className="space-y-3">
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Tên sách</Form.Label>
+              <Form.Control
+                type="text"
+                name="ten_sach"
+                value={sach.ten_sach}
+                onChange={handleChange}
+                required
+              />
+            </Form.Group>
+
+            <div className="row">
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold">Tác giả</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="ten_tac_gia"
+                    value={sach.ten_tac_gia}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
+              </div>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold">Nhà xuất bản</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="ten_NXB"
+                    value={sach.ten_NXB}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-4">
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold">Giá (₫)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="gia_sach"
+                    value={sach.gia_sach}
+                    onChange={handleChange}
+                    required
+                  />
+                </Form.Group>
+              </div>
+              <div className="col-md-4">
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold">Giảm giá (₫)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="gg_sach"
+                    value={sach.gg_sach}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
+              </div>
+              <div className="col-md-4">
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold">Tồn kho</Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="ton_kho_sach"
+                    value={sach.ton_kho_sach}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold">Loại bìa</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="loai_bia"
+                    value={sach.loai_bia}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
+              </div>
+            </div>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Mô tả</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={4}
+                name="mo_ta"
+                value={sach.mo_ta}
+                onChange={handleChange}
+              />
+            </Form.Group>
+
+            <div className="d-flex justify-content-end">
+              <Button
+                type="submit"
+                variant="primary"
+                className="fw-semibold px-4"
+                disabled={saving}
+              >
+                {saving ? "💾 Đang lưu..." : "✅ Lưu thay đổi"}
+              </Button>
+            </div>
+          </Form>
+        </Card>
+      </div>
     </div>
   );
 }
