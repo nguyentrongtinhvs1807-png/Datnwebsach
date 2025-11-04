@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminProduct from "@/components/admin.product";
 import Sidebar from "@/components/sidebar";
-import VoucherManager from "@/components/voucher.manager"; // ✅ Thêm dòng này
+import VoucherManager from "@/components/voucher.manager";
+import OrdersPage from "@/app/admin/orders/page"; 
+import AdminDanhMucPage from "@/app/admin/danhmuc/page"; // ✅ Gọi đúng trang quản lý danh mục
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -45,40 +47,50 @@ function UserManager() {
 
   return (
     <div>
-      <input
-        type="text"
-        className="form-control mb-3"
-        placeholder="🔍 Tìm kiếm theo tên hoặc email..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div className="mb-4">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Tìm kiếm theo tên hoặc email..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px" }}
+        />
+      </div>
       {filtered.length === 0 ? (
-        <p className="text-muted text-center">Không có người dùng nào.</p>
+        <div className="text-center py-5">
+          <p className="text-muted fs-5">Không có người dùng nào.</p>
+        </div>
       ) : (
-        <div className="table-responsive shadow-sm rounded">
-          <table className="table table-hover align-middle">
-            <thead className="table-dark">
+        <div className="table-responsive shadow-sm rounded-3 overflow-hidden">
+          <table className="table table-hover align-middle mb-0">
+            <thead style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}>
               <tr>
-                <th>ID</th>
-                <th>Tên</th>
-                <th>Email</th>
-                <th>Vai trò</th>
-                <th>Thao tác</th>
+                <th style={{ fontWeight: 600 }}>ID</th>
+                <th style={{ fontWeight: 600 }}>Tên</th>
+                <th style={{ fontWeight: 600 }}>Email</th>
+                <th style={{ fontWeight: 600 }}>Vai trò</th>
+                <th style={{ fontWeight: 600 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((u) => (
-                <tr key={u.nguoi_dung_id}>
-                  <td>{u.nguoi_dung_id}</td>
+                <tr key={u.nguoi_dung_id} style={{ transition: "background 0.2s" }}>
+                  <td className="fw-semibold">{u.nguoi_dung_id}</td>
                   <td>{u.ten || u.ho_ten}</td>
                   <td>{u.email}</td>
-                  <td>{u.role === "admin" ? "Quản trị viên" : "Người dùng"}</td>
+                  <td>
+                    <span className={`badge ${u.role === "admin" ? "bg-danger" : "bg-primary"}`} style={{ padding: "6px 12px", borderRadius: "8px" }}>
+                      {u.role === "admin" ? "Quản trị viên" : "Người dùng"}
+                    </span>
+                  </td>
                   <td>
                     <button
                       className="btn btn-sm btn-outline-danger"
                       onClick={() => deleteUser(u.nguoi_dung_id)}
+                      style={{ borderRadius: "8px", fontWeight: 500 }}
                     >
-                      ❌ Ẩn Người Dùng
+                      Ẩn Người Dùng
                     </button>
                   </td>
                 </tr>
@@ -135,147 +147,48 @@ function CommentManager() {
 
   return (
     <div>
-      <input
-        type="text"
-        className="form-control mb-3"
-        placeholder="🔍 Tìm kiếm theo người dùng hoặc nội dung..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div className="mb-4">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Tìm kiếm theo người dùng hoặc nội dung..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px" }}
+        />
+      </div>
       {filtered.length === 0 ? (
-        <p className="text-muted text-center">Không có bình luận nào.</p>
+        <div className="text-center py-5">
+          <p className="text-muted fs-5">Không có bình luận nào.</p>
+        </div>
       ) : (
-        <div className="table-responsive shadow-sm rounded">
-          <table className="table table-hover align-middle">
-            <thead className="table-dark">
+        <div className="table-responsive shadow-sm rounded-3 overflow-hidden">
+          <table className="table table-hover align-middle mb-0">
+            <thead style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}>
               <tr>
-                <th>ID</th>
-                <th>Sách</th>
-                <th>Người dùng</th>
-                <th>Nội dung</th>
-                <th>Ngày bình luận</th>
-                <th>Thao tác</th>
+                <th style={{ fontWeight: 600 }}>ID</th>
+                <th style={{ fontWeight: 600 }}>Sách</th>
+                <th style={{ fontWeight: 600 }}>Người dùng</th>
+                <th style={{ fontWeight: 600 }}>Nội dung</th>
+                <th style={{ fontWeight: 600 }}>Ngày bình luận</th>
+                <th style={{ fontWeight: 600 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.binh_luan_id}>
-                  <td>{c.binh_luan_id}</td>
+                <tr key={c.binh_luan_id} style={{ transition: "background 0.2s" }}>
+                  <td className="fw-semibold">{c.binh_luan_id}</td>
                   <td>{getSachName(c.sach_id)}</td>
                   <td>{getUserName(c.nguoi_dung_id)}</td>
-                  <td>{c.nd_bl}</td>
+                  <td style={{ maxWidth: "300px", wordBreak: "break-word" }}>{c.nd_bl}</td>
                   <td>{new Date(c.ngay_bl).toLocaleString("vi-VN")}</td>
                   <td>
                     <button
                       className="btn btn-sm btn-outline-danger"
                       onClick={() => deleteComment(c.binh_luan_id)}
+                      style={{ borderRadius: "8px", fontWeight: 500 }}
                     >
-                      ❌ Ẩn
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ========== QUẢN LÝ ĐƠN HÀNG ==========
-function OrderManager() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    fetch("http://localhost:3003/orders")
-      .then((res) => res.json())
-      .then((data) => setOrders(Array.isArray(data) ? data : []))
-      .catch(() => setOrders([]));
-
-    fetch("http://localhost:3003/users")
-      .then((res) => res.json())
-      .then((data) => setUsers(Array.isArray(data) ? data : []))
-      .catch(() => setUsers([]));
-  }, []);
-
-  const getUserName = (id: number) =>
-    users.find((u) => u.nguoi_dung_id === id)?.ten || `User #${id}`;
-
-  const deleteOrder = async (id: number) => {
-    if (!confirm("Bạn có chắc muốn xoá đơn hàng này?")) return;
-    await fetch(`http://localhost:3003/orders/${id}`, { method: "DELETE" });
-    setOrders((prev) => prev.filter((o) => o.don_hang_id !== id));
-  };
-
-  const updateStatus = async (id: number, newStatus: string) => {
-    await fetch(`http://localhost:3003/orders/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trang_thai: newStatus }),
-    });
-    setOrders((prev) =>
-      prev.map((o) => (o.don_hang_id === id ? { ...o, trang_thai: newStatus } : o))
-    );
-  };
-
-  const filtered = orders.filter((o) => {
-    const userName = getUserName(o.nguoi_dung_id).toLowerCase();
-    const keyword = search.toLowerCase();
-    return userName.includes(keyword) || o.trang_thai.toLowerCase().includes(keyword);
-  });
-
-  return (
-    <div>
-      <input
-        type="text"
-        className="form-control mb-3"
-        placeholder="🔍 Tìm kiếm theo người dùng hoặc trạng thái..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-      {filtered.length === 0 ? (
-        <p className="text-muted text-center">Không có đơn hàng nào.</p>
-      ) : (
-        <div className="table-responsive shadow-sm rounded">
-          <table className="table table-hover align-middle">
-            <thead className="table-dark">
-              <tr>
-                <th>ID</th>
-                <th>Người dùng</th>
-                <th>Tổng tiền</th>
-                <th>Ngày đặt</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((o) => (
-                <tr key={o.don_hang_id}>
-                  <td>{o.don_hang_id}</td>
-                  <td>{getUserName(o.nguoi_dung_id)}</td>
-                  <td>{o.tong_tien.toLocaleString("vi-VN")} ₫</td>
-                  <td>{new Date(o.ngay_dat).toLocaleString("vi-VN")}</td>
-                  <td>
-                    <select
-                      value={o.trang_thai}
-                      onChange={(e) => updateStatus(o.don_hang_id, e.target.value)}
-                      className="form-select form-select-sm"
-                    >
-                      <option value="Chờ xác nhận">Chờ xác nhận</option>
-                      <option value="Đang giao">Đang giao</option>
-                      <option value="Hoàn thành">Hoàn thành</option>
-                      <option value="Đã hủy">Đã hủy</option>
-                    </select>
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => deleteOrder(o.don_hang_id)}
-                    >
-                      ❌ Xoá
+                      Ẩn
                     </button>
                   </td>
                 </tr>
@@ -309,7 +222,14 @@ function Dashboard() {
     }, 1000);
   }, []);
 
-  if (!stats) return <p>⏳ Đang tải dữ liệu thống kê...</p>;
+  if (!stats) return (
+    <div className="text-center py-5">
+      <div className="spinner-border text-primary" role="status">
+        <span className="visually-hidden">Đang tải...</span>
+      </div>
+      <p className="mt-3 text-muted">Đang tải dữ liệu thống kê...</p>
+    </div>
+  );
 
   const chartData = {
     labels: stats.revenue.map((r: any) => r.month),
@@ -324,35 +244,44 @@ function Dashboard() {
 
   return (
     <div>
-      <h4 className="fw-bold text-primary mb-4">📊 Thống kê tổng quan</h4>
-      <div className="row text-center mb-4">
+      <h4 className="fw-bold mb-4" style={{ color: "#21409A" }}>Thống kê tổng quan</h4>
+      <div className="row g-4 mb-4">
         <div className="col-md-4">
-          <div className="bg-primary bg-opacity-25 p-3 rounded">
-            <h5>Sản phẩm</h5>
-            <p className="fs-3 fw-bold">{stats.products}</p>
+          <div className="p-4 rounded-4 shadow-sm" style={{ 
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white"
+          }}>
+            <h5 className="mb-2" style={{ opacity: 0.9 }}>Sản phẩm</h5>
+            <p className="fs-1 fw-bold mb-0">{stats.products}</p>
           </div>
         </div>
         <div className="col-md-4">
-          <div className="bg-success bg-opacity-25 p-3 rounded">
-            <h5>Đơn hàng</h5>
-            <p className="fs-3 fw-bold">{stats.orders}</p>
+          <div className="p-4 rounded-4 shadow-sm" style={{ 
+            background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+            color: "white"
+          }}>
+            <h5 className="mb-2" style={{ opacity: 0.9 }}>Đơn hàng</h5>
+            <p className="fs-1 fw-bold mb-0">{stats.orders}</p>
           </div>
         </div>
         <div className="col-md-4">
-          <div className="bg-warning bg-opacity-25 p-3 rounded">
-            <h5>Người dùng</h5>
-            <p className="fs-3 fw-bold">{stats.users}</p>
+          <div className="p-4 rounded-4 shadow-sm" style={{ 
+            background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+            color: "white"
+          }}>
+            <h5 className="mb-2" style={{ opacity: 0.9 }}>Người dùng</h5>
+            <p className="fs-1 fw-bold mb-0">{stats.users}</p>
           </div>
         </div>
       </div>
-      <div className="bg-white shadow p-4 rounded-3">
+      <div className="bg-white shadow-sm p-4 rounded-4" style={{ border: "1px solid #e0e0e0" }}>
         <Bar data={chartData} />
       </div>
     </div>
   );
 }
 
-// ========== TRANG QUẢN TRỊ ==========
+// ========== TRANG ADMIN ==========
 export default function AdminPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -380,50 +309,63 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="d-flex min-vh-100 bg-light">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} handleLogout={handleLogout} />
+    <div className="d-flex min-vh-100" style={{ background: "#f5f7fa" }}>
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        handleLogout={handleLogout}
+      />
 
       <main className="flex-grow-1 p-4">
-        <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-          <h2 className="fw-bold text-uppercase">Bảng điều khiển quản trị</h2>
+        <div className="d-flex justify-content-between align-items-center mb-4 pb-3" style={{ borderBottom: "2px solid #e0e0e0" }}>
+          <div>
+            <h2 className="fw-bold mb-1" style={{ color: "#21409A", letterSpacing: "0.5px" }}>Bảng điều khiển quản trị</h2>
+            <p className="text-muted mb-0 small">Quản lý và theo dõi hệ thống</p>
+          </div>
           {user && (
-            <div className="text-end">
-              <div className="fw-semibold">👋 Xin chào, {user.ten}</div>
+            <div className="text-end p-3 rounded-3" style={{ background: "linear-gradient(90deg, #fff9e6 0%, #ffeecf 100%)", minWidth: "200px" }}>
+              <div className="fw-semibold text-dark">Xin chào, {user.ten}</div>
               <small className="text-muted">{user.email}</small>
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-3 shadow-sm p-4">
+        <div className="bg-white rounded-4 shadow-sm p-4" style={{ border: "1px solid #e8e8e8" }}>
           {activeTab === "dashboard" && <Dashboard />}
           {activeTab === "products" && (
             <>
-              <h4 className="fw-bold text-primary mb-3">📦 Quản lý sản phẩm</h4>
+              <h4 className="fw-bold text-primary mb-3">Quản lý sản phẩm</h4>
               <AdminProduct />
             </>
           )}
           {activeTab === "comments" && (
             <>
-              <h4 className="fw-bold text-primary mb-3">💬 Quản lý bình luận</h4>
+              <h4 className="fw-bold text-primary mb-3">Quản lý bình luận</h4>
               <CommentManager />
             </>
           )}
           {activeTab === "users" && (
             <>
-              <h4 className="fw-bold text-primary mb-3">👤 Quản lý người dùng</h4>
+              <h4 className="fw-bold text-primary mb-3"> Quản lý người dùng</h4>
               <UserManager />
             </>
           )}
           {activeTab === "orders" && (
             <>
-              <h4 className="fw-bold text-primary mb-3">🧾 Quản lý đơn hàng</h4>
-              <OrderManager />
+              <h4 className="fw-bold text-primary mb-3"> Quản lý đơn hàng</h4>
+              <OrdersPage />
             </>
           )}
           {activeTab === "voucher" && (
             <>
-              <h4 className="fw-bold text-primary mb-3">🎟️ Quản lý Voucher</h4>
-              <VoucherManager /> {/* ✅ Gọi component VoucherManager */}
+              <h4 className="fw-bold text-primary mb-3"> Quản lý Voucher</h4>
+              <VoucherManager />
+            </>
+          )}
+          {activeTab === "danhmuc" && (
+            <>
+              <h4 className="fw-bold text-primary mb-3">Quản lý Danh Mục</h4>
+              <AdminDanhMucPage /> {/* ✅ Gọi đúng trang danh mục */}
             </>
           )}
         </div>

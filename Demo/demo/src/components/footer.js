@@ -4,12 +4,12 @@ const Footer = () => {
       <div className="container">
         {/* --- Đăng ký nhận bản tin --- */}
         <div className="text-center mb-4">
-        <img
-  src="https://png.pngtree.com/png-clipart/20200727/original/pngtree-book-store-logo-template-sale-learning-logo-designs-vector-png-image_5272617.jpg"
-  alt="Pibook"
-  className="mx-auto my-4"
-  style={{ height: "60px", width: "auto", objectFit: "contain" }}
-/>
+          <img
+            src="/image/Grace.png"
+            alt="Pibook"
+            className="mx-auto my-4"
+            style={{ height: "60px", width: "auto", objectFit: "contain" }}
+          />
 
           <h6 className="fw-bold text-warning">Đăng ký nhận bản tin</h6>
           <p className="text-secondary">
@@ -23,7 +23,7 @@ const Footer = () => {
               <input type="email" className="form-control" placeholder="Email của bạn" />
             </div>
             <div className="col-md-3 d-flex justify-content-center flex-wrap">
-              {["NAM", "NỮ", "LGBT"].map((g) => (
+              {["NAM", "NỮ"].map((g) => (
                 <button key={g} type="button" className="btn btn-warning mx-1 text-dark fw-bold">
                   {g}
                 </button>
@@ -73,7 +73,7 @@ const Footer = () => {
 
           {/* Luonvuituoi */}
           <div className="col-md-3 mb-3">
-          cậy để bạn <strong>mua sách trực tuyến</strong>,  còn có quà
+            cậy để bạn <strong>mua sách trực tuyến</strong>,  còn có quà
             <h6 className="fw-bold text-uppercase text-warning">Pibook</h6>
             <ul className="list-unstyled">
               <li><a href="about" className="text-light text-decoration-none">Giới thiệu</a></li>

@@ -20,7 +20,7 @@ export default function AdminProduct() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ Lấy dữ liệu sách từ backend
+  //  Lấy dữ liệu sách từ backend
   useEffect(() => {
     fetch("http://localhost:3003/sach")
       .then((res) => {
@@ -51,7 +51,7 @@ export default function AdminProduct() {
   if (error)
     return (
       <p className="text-center text-red-500 font-semibold py-6">
-        ⚠️ Lỗi: {error}
+         Lỗi: {error}
       </p>
     );
 
@@ -60,7 +60,7 @@ export default function AdminProduct() {
       <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <div className="flex justify-between items-center mb-6 border-b pb-3">
           <h2 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-            📚 Quản lý sản phẩm (Sách)
+             Quản lý sản phẩm (Sách)
           </h2>
           <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-medium transition">
             ➕ Thêm sách

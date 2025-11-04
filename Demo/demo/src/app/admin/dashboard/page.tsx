@@ -26,7 +26,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
-    // ✅ Dữ liệu giả lập
+    //  Dữ liệu giả lập
     setTimeout(() => {
       setStats({
         products: 53,
@@ -43,7 +43,7 @@ export default function Dashboard() {
     }, 1000); // mô phỏng load API 1 giây
   }, []);
 
-  if (!stats) return <p>⏳ Đang tải dữ liệu thống kê...</p>;
+  if (!stats) return <p> Đang tải dữ liệu thống kê...</p>;
 
   const chartData = {
     labels: stats.revenue.map((r) => r.month),
@@ -60,7 +60,7 @@ export default function Dashboard() {
     responsive: true,
     plugins: {
       legend: { position: "top" as const },
-      title: { display: true, text: "📈 Doanh thu theo tháng" },
+      title: { display: true, text: " Doanh thu theo tháng" },
     },
   };
 
@@ -71,15 +71,15 @@ export default function Dashboard() {
       {/* Các ô thống kê */}
       <div className="grid grid-cols-3 gap-6 mb-6">
         <div className="bg-blue-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold">📦 Sản phẩm</h2>
+          <h2 className="text-lg font-semibold"> Sản phẩm</h2>
           <p className="text-3xl font-bold">{stats.products}</p>
         </div>
         <div className="bg-green-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold">🧾 Đơn hàng</h2>
+          <h2 className="text-lg font-semibold"> Đơn hàng</h2>
           <p className="text-3xl font-bold">{stats.orders}</p>
         </div>
         <div className="bg-yellow-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold">👤 Người dùng</h2>
+          <h2 className="text-lg font-semibold"> Người dùng</h2>
           <p className="text-3xl font-bold">{stats.users}</p>
         </div>
       </div>

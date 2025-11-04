@@ -5,83 +5,104 @@ import { Button } from "react-bootstrap";
 export default function Sidebar({ activeTab, setActiveTab, handleLogout }: any) {
   return (
     <aside
-      className="bg-dark text-white p-3 d-flex flex-column"
-      style={{ width: "250px" }}
+      className="bg-dark text-white p-4 d-flex flex-column"
+      style={{ 
+        width: "260px", 
+        minHeight: "100vh",
+        background: "linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)",
+        boxShadow: "2px 0 10px rgba(0,0,0,0.1)"
+      }}
     >
-      <h4 className="fw-bold text-center border-bottom pb-2">📚 Pibook Admin</h4>
+      {/* Tiêu đề */}
+      <div className="text-center border-bottom pb-3 mb-3">
+        <h4 className="fw-bold mb-0" style={{ color: "#ffc107", letterSpacing: "0.5px" }}>Pibook Admin</h4>
+        <small className="text-muted">Trang quản trị</small>
+      </div>
 
-      <nav className="flex-grow-1 mt-4">
+      {/* Menu chính */}
+      <nav className="flex-grow-1">
         <ul className="list-unstyled">
           <li
-            className={`py-2 px-3 rounded ${
-              activeTab === "dashboard" ? "bg-secondary" : ""
+            className={`py-2 px-3 rounded mb-2 ${
+              activeTab === "dashboard" ? "bg-warning text-dark" : "hover-bg-light"
             }`}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "all 0.2s" }}
             onClick={() => setActiveTab("dashboard")}
           >
-            🏠 Trang chủ
+            Trang chủ
           </li>
 
           <li
-            className={`py-2 px-3 rounded ${
-              activeTab === "products" ? "bg-secondary" : ""
+            className={`py-2 px-3 rounded mb-2 ${
+              activeTab === "products" ? "bg-warning text-dark" : "hover-bg-light"
             }`}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "all 0.2s" }}
             onClick={() => setActiveTab("products")}
           >
-            📦 Quản lý sản phẩm
+            Quản lý sản phẩm
           </li>
 
           <li
-            className={`py-2 px-3 rounded ${
-              activeTab === "comments" ? "bg-secondary" : ""
+            className={`py-2 px-3 rounded mb-2 ${
+              activeTab === "comments" ? "bg-warning text-dark" : "hover-bg-light"
             }`}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "all 0.2s" }}
             onClick={() => setActiveTab("comments")}
           >
-            💬 Quản lý bình luận
+            Quản lý bình luận
           </li>
 
           <li
-            className={`py-2 px-3 rounded ${
-              activeTab === "users" ? "bg-secondary" : ""
+            className={`py-2 px-3 rounded mb-2 ${
+              activeTab === "users" ? "bg-warning text-dark" : "hover-bg-light"
             }`}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "all 0.2s" }}
             onClick={() => setActiveTab("users")}
           >
-            👤 Người dùng
+            Người dùng
           </li>
 
           <li
-            className={`py-2 px-3 rounded ${
-              activeTab === "orders" ? "bg-secondary" : ""
+            className={`py-2 px-3 rounded mb-2 ${
+              activeTab === "orders" ? "bg-warning text-dark" : "hover-bg-light"
             }`}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "all 0.2s" }}
             onClick={() => setActiveTab("orders")}
           >
-            🧾 Đơn hàng
+            Đơn hàng
           </li>
 
-          {/* ✅ Thêm mục Quản lý Voucher */}
           <li
-            className={`py-2 px-3 rounded ${
-              activeTab === "voucher" ? "bg-secondary" : ""
+            className={`py-2 px-3 rounded mb-2 ${
+              activeTab === "voucher" ? "bg-warning text-dark" : "hover-bg-light"
             }`}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "all 0.2s" }}
             onClick={() => setActiveTab("voucher")}
           >
-            🎟️ Quản lý Voucher
+            Quản lý Voucher
+          </li>
+
+          <li
+            className={`py-2 px-3 rounded mb-2 ${
+              activeTab === "danhmuc" ? "bg-warning text-dark" : "hover-bg-light"
+            }`}
+            style={{ cursor: "pointer", transition: "all 0.2s" }}
+            onClick={() => setActiveTab("danhmuc")}
+          >
+            Quản lý Danh Mục
           </li>
         </ul>
       </nav>
 
-      <div className="mt-auto">
+      {/* Đăng xuất */}
+      <div className="mt-auto pt-3 border-top">
         <Button
           variant="outline-light"
           className="w-100 fw-semibold"
           onClick={handleLogout}
+          style={{ borderRadius: "8px" }}
         >
-          🚪 Đăng xuất
+          Đăng xuất
         </Button>
       </div>
     </aside>

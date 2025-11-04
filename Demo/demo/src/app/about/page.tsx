@@ -1,96 +1,190 @@
 "use client";
+
 import { motion } from "framer-motion";
-import { BookOpen, Star, Truck, ShieldCheck } from "lucide-react";
+import { BookOpen } from "lucide-react";
+import { Container, Row, Col, Card, Button } from "react-bootstrap";
 
 export default function About() {
   return (
-    <div className="bg-gradient-to-br from-blue-50 via-white to-blue-100 min-h-screen flex flex-col items-center justify-center p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="max-w-5xl bg-white shadow-2xl rounded-3xl p-10 text-center"
-      >
-        {/* Tiêu đề */}
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-          📚 Chào mừng đến với{" "}
-          <span className="text-blue-600">Nhà Sách Pibook</span>
-        </h1>
-        <p className="text-lg text-gray-600 mb-6 leading-relaxed max-w-3xl mx-auto">
-        Pibook là điểm đến lý tưởng cho những ai yêu sách. 
-          Chúng tôi mang đến hàng ngàn tựa sách đa dạng từ văn học, kỹ năng sống, kinh tế 
-          cho đến truyện thiếu nhi. Sứ mệnh của chúng tôi là{" "}
-          <strong className="text-blue-600">lan tỏa tri thức</strong> 
-          và đồng hành cùng bạn trên hành trình khám phá tri thức vô tận.
-        </p>
-
-        {/* Banner */}
-        <motion.img
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          src="/image/b9690ac7ec4b7c94d44d9e519b6c30e7.jpg"
-          alt="Nhà sách Luonvuituoi Banner"
-          className="w-full rounded-xl shadow-lg mb-12"
-        />
-
-        {/* Sứ mệnh */}
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-          🎯 Sứ mệnh của chúng tôi
-        </h2>
-        <p className="text-gray-600 mb-12 leading-relaxed max-w-3xl mx-auto">
-          Xây dựng một cộng đồng yêu sách, nơi mọi người có thể tìm thấy niềm cảm hứng, 
-          tri thức và sự sáng tạo. Chúng tôi luôn nỗ lực mang lại{" "}
-          <span className="font-semibold text-gray-800">sản phẩm chất lượng</span>,{" "}
-          <span className="font-semibold text-gray-800">dịch vụ tận tâm</span> 
-          và những trải nghiệm mua sắm tuyệt vời.
-        </p>
-
-        {/* Lý do chọn */}
-        <h2 className="text-2xl font-semibold text-gray-800 mb-8">
-          ✨ Tại sao nên chọn Pibook?
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="flex items-start gap-4 p-5 rounded-xl shadow bg-blue-50 hover:shadow-lg transition">
-            <BookOpen className="w-8 h-8 text-blue-600" />
-            <p className="text-left text-gray-700">
-              <strong>Kho sách khổng lồ:</strong> Hàng ngàn đầu sách thuộc nhiều thể loại phong phú.
-            </p>
-          </div>
-          <div className="flex items-start gap-4 p-5 rounded-xl shadow bg-blue-50 hover:shadow-lg transition">
-            <ShieldCheck className="w-8 h-8 text-green-600" />
-            <p className="text-left text-gray-700">
-              <strong>Sách chính hãng:</strong> Đảm bảo chất lượng in ấn, giấy tốt, bền đẹp.
-            </p>
-          </div>
-          <div className="flex items-start gap-4 p-5 rounded-xl shadow bg-blue-50 hover:shadow-lg transition">
-            <Star className="w-8 h-8 text-yellow-500" />
-            <p className="text-left text-gray-700">
-              <strong>Giá cả hợp lý:</strong> Thường xuyên có chương trình khuyến mãi hấp dẫn.
-            </p>
-          </div>
-          <div className="flex items-start gap-4 p-5 rounded-xl shadow bg-blue-50 hover:shadow-lg transition">
-            <Truck className="w-8 h-8 text-red-500" />
-            <p className="text-left text-gray-700">
-              <strong>Dịch vụ chuyên nghiệp:</strong> Giao hàng nhanh chóng, hỗ trợ khách hàng tận tình.
-            </p>
-          </div>
-        </div>
-
-        {/* CTA */}
+    <div
+      style={{
+        background: "linear-gradient(115deg,#eef6ff 50%,#fff6e1 100%)",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        padding: "60px 0",
+      }}
+    >
+      <Container>
         <motion.div
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 0.6 }}
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.85 }}
         >
-          <a
-            href="/products"
-            className="bg-blue-600 text-white px-10 py-4 rounded-xl shadow-lg hover:bg-blue-700 transition-all text-lg font-semibold"
+          {/* Tiêu đề */}
+          <div className="text-center mb-5">
+            <h1 className="fw-bold display-4 text-dark" style={{letterSpacing: ".01em"}}>
+              Chào mừng đến với{" "}
+              <span className="text-primary" style={{textShadow: "0 2px 18px #cbeeff74"}}>
+                Nhà Sách Pibook
+              </span>
+            </h1>
+            <p className="text-muted fs-5 mt-3 mx-auto" style={{ maxWidth: "760px", lineHeight: 1.65, fontSize: "1.22rem" }}>
+              <strong className="text-primary-emphasis">Pibook</strong> là nơi lưu giữ tri thức và cảm hứng đọc sách, mang đến hàng nghìn đầu sách chất lượng cao cho cộng đồng yêu đọc.<br />
+              Sứ mệnh của chúng tôi là{" "}
+              <span className="fw-semibold text-warning">lan tỏa tri thức & kết nối đam mê</span>
+              {" "}— đồng hành cùng bạn trên hành trình phát triển bản thân.
+            </p>
+          </div>
+
+          {/* Banner lớn */}
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-5"
           >
-            🔎 Khám phá ngay
-          </a>
+            <div className="rounded-4 shadow-lg p-0 overflow-hidden mx-auto" style={{
+              maxHeight: 370,
+              maxWidth: 990,
+              border: "5px solid #fffbe9",
+              boxShadow: "0 6px 42px #d8e7ff13"
+            }}>
+              <img
+                src="/image/b9690ac7ec4b7c94d44d9e519b6c30e7.jpg"
+                alt="Banner Nhà sách Pibook"
+                className="img-fluid w-100"
+                style={{objectFit: "cover", height: "360px", borderRadius: "2.1rem"}}
+              />
+            </div>
+          </motion.div>
+
+          {/* Sứ mệnh */}
+          <Row className="align-items-center mb-5">
+            <Col xs={12} md={4} className="mb-4 mb-md-0 text-center">
+              <motion.div
+                initial={{ opacity: 0, x: -25 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.7, delay: 0.07 }}
+                className="d-inline-flex flex-column gap-2 align-items-center"
+              >
+                <div
+                  className="bg-white shadow-sm rounded-circle d-flex justify-content-center align-items-center"
+                  style={{width: 94, height: 94, marginBottom: 8, border: "3.5px solid #ffeab6"}}
+                >
+                  <BookOpen color="#29b492" size={55} />
+                </div>
+                <div className="fw-bold fs-5 text-success-emphasis" style={{letterSpacing: ".03em"}}>
+                  Sứ mệnh Pibook
+                </div>
+              </motion.div>
+            </Col>
+            <Col xs={12} md={8}>
+              <motion.div
+                initial={{ opacity: 0, x: 32 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.7, delay: 0.07 }}
+              >
+                <Card className="border-0 shadow rounded-4 p-3" style={{background: "linear-gradient(100deg,#fffbe7 70%,#e7f2ff 100%)"}}>
+                  <Card.Body>
+                    <p className="fs-5 text-secondary mb-0" style={{lineHeight: 1.7}}>
+                      <strong className="text-dark">Xây dựng cộng đồng yêu sách</strong> — nơi ai cũng tìm thấy cảm hứng, tri thức mới và động lực sáng tạo.<br />
+                      Chúng tôi cam kết mang lại <span className="text-warning fw-semibold">sản phẩm chất lượng</span>,{" "}
+                      <span className="text-primary fw-semibold">dịch vụ tận tâm</span> và{" "}
+                      <span className="text-success fw-semibold">trải nghiệm mua sắm tuyệt vời nhất</span>.
+                    </p>
+                  </Card.Body>
+                </Card>
+              </motion.div>
+            </Col>
+          </Row>
+
+          {/* Lý do nên chọn Pibook */}
+          <div className="text-center mb-5">
+            <h2
+              className="fw-bolder mb-4"
+              style={{
+                color: "#085b9a",
+                letterSpacing: ".02em",
+                textShadow: "0 2px 13px #b1cfff35"
+              }}
+            >
+              Vì sao nên chọn Pibook?
+            </h2>
+          </div>
+          <Row className="g-4 justify-content-center">
+            {[
+              {
+                title: "Kho sách phong phú",
+                desc: "Hơn 5.000+ đầu sách đa thể loại: thiếu nhi, kỹ năng, kinh tế, tiểu thuyết...",
+                bg: "linear-gradient(120deg,#fdf6e3,#f3f9ff 90%)",
+                border: "#ffe0b2"
+              },
+              {
+                title: "Chất lượng & Uy tín",
+                desc: "Cam kết sách chính hãng, kiểm duyệt kỹ càng từng bìa sách, trang giấy trước khi tới tay bạn.",
+                bg: "linear-gradient(98deg,#f7fedb 60%,#fcf4e9 100%)",
+                border: "#daf9c7"
+              },
+              {
+                title: "Giá ưu đãi hợp lý",
+                desc: "Khuyến mãi thường xuyên, freeship cho nhiều đơn hàng, tích điểm nhận voucher.",
+                bg: "linear-gradient(130deg,#fffedf 70%,#ffe7f2 100%)",
+                border: "#ffe5ec"
+              },
+              {
+                title: "Giao hàng tận nơi nhanh",
+                desc: "Hỗ trợ đổi trả - giao nhanh toàn quốc, đóng gói đẹp, an toàn.",
+                bg: "linear-gradient(138deg,#edfff4 70%,#e7f5fc 100%)",
+                border: "#cdf3e9"
+              }
+            ].map((item, i) => (
+              <Col md={6} lg={3} key={i}>
+                <Card
+                  className="border-0 shadow-md h-100 rounded-4 p-3 custom-blur-card"
+                  style={{
+                    background: item.bg,
+                    borderLeft: `6px solid ${item.border}`,
+                    boxShadow: "0 6px 28px #6eaaf61d,0 2px 7px #ffe08a16"
+                  }}
+                >
+                  <Card.Body>
+                    <h5 className="fw-bold mb-2 text-dark" style={{
+                      fontSize: "1.16rem",
+                      letterSpacing: ".01em"
+                    }}>{item.title}</h5>
+                    <p className="text-secondary mb-0" style={{fontSize: ".99rem", lineHeight: 1.6}}>{item.desc}</p>
+                  </Card.Body>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+          {/* CTA */}
+          <motion.div
+            className="text-center mt-5"
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.6 }}
+          >
+            <Button
+              href="/products"
+              variant="warning"
+              size="lg"
+              className="px-5 py-3 rounded-4 shadow fw-bold"
+              style={{
+                fontSize: "1.12rem",
+                letterSpacing: ".005em",
+                background: "linear-gradient(87deg, #ffc21c 75%, #ffe8aa 100%)",
+                color: "#574208",
+                border: "none",
+                boxShadow: "0 4px 18px #ffda8850, 0 2px 9px #fffbe0ba"
+              }}
+            >
+              Khám phá sách ngay →
+            </Button>
+          </motion.div>
         </motion.div>
-      </motion.div>
+      </Container>
     </div>
   );
 }

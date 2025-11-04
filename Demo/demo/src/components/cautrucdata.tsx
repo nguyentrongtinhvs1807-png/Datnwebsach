@@ -14,8 +14,9 @@ export interface ISach {
   gia_sach: number;
   ton_kho_sach: number;
   mo_ta: string;
-  gg_sach: number; // 👉 gg có thể là “giảm giá” → nên ghi chú rõ
+  gg_sach: number; 
   loai_bia: string;
-  image?: string; // 👉 thêm ảnh vì anh đang dùng `book.image` bên UI
-  created_at?: string; // 👉 nếu sau này cần hiển thị “new” theo ngày
+  image?: string; 
+  created_at?: string; 
+  an_hien?: number; 
 }

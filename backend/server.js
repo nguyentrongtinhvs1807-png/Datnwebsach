@@ -3,6 +3,8 @@ const mysql = require("mysql2");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const QRCode = require("qrcode");
+const fs = require("fs");
 
 const app = express();
 
@@ -134,6 +136,55 @@ app.get("/voucher", (req, res) => {
     }
 
     res.json(voucher);
+  });
+});
+
+// ✅ API endpoint mới cho checkout - format phù hợp với frontend
+app.get("/discount-codes/:code", (req, res) => {
+  const code = req.params.code;
+
+  if (!code) {
+    return res.status(400).json({ error: "Thiếu mã giảm giá" });
+  }
+
+  const sql = "SELECT * FROM ma_giam_gia WHERE ma_gg = ? AND trang_thai = 1";
+  db.query(sql, [code], (err, results) => {
+    if (err) {
+      console.error("❌ Lỗi truy vấn mã giảm giá:", err);
+      return res.status(500).json({ error: "Lỗi server khi kiểm tra mã giảm giá" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: "Mã giảm giá không hợp lệ" });
+    }
+
+    const voucher = results[0];
+    const today = new Date();
+    const startDate = new Date(voucher.ngay_bd);
+    const endDate = new Date(voucher.ngay_kt);
+
+    // Kiểm tra ngày hiệu lực
+    if (today < startDate) {
+      return res.status(400).json({ error: "Mã giảm giá chưa có hiệu lực" });
+    }
+
+    if (today > endDate) {
+      return res.status(400).json({ error: "Mã giảm giá đã hết hạn" });
+    }
+
+    // Map dữ liệu từ database sang format frontend mong đợi
+    const loaiGiam = voucher.loai_giam?.toLowerCase();
+    const discountType = loaiGiam === "phan_tram" || loaiGiam === "percent" ? "percent" : "fixed";
+
+    res.json({
+      code: voucher.ma_gg,
+      type: discountType,
+      value: parseFloat(voucher.gia_tri_giam),
+      maxDiscount: parseFloat(voucher.giam_toi_da || 0),
+      minOrder: parseFloat(voucher.don_toi_thieu || 0),
+      startDate: voucher.ngay_bd,
+      endDate: voucher.ngay_kt,
+    });
   });
 });
 
@@ -484,7 +535,7 @@ app.delete("/comments/:id", (req, res) => {
 
 // ✅ API: Lấy toàn bộ danh sách sản phẩm
 app.get("/products", (req, res) => {
-  const sql = "SELECT * FROM sach"; // ⚠️ nếu bảng bạn tên 'san_pham' thì sửa lại cho đúng
+  const sql = "SELECT * FROM sach"; 
 
   db.query(sql, (err, results) => {
     if (err) {
@@ -495,11 +546,22 @@ app.get("/products", (req, res) => {
   });
 });
 
-// ✅ API: Lấy danh sách sách
+// ✅ API: Lấy danh sách sách (bao gồm cả sách đã ẩn cho admin)
 app.get("/sach", (req, res) => {
+  // Đảm bảo cột an_hien tồn tại và set mặc định = 1 cho tất cả sách
+  db.query("ALTER TABLE sach ADD COLUMN IF NOT EXISTS an_hien INT DEFAULT 1", (errAlter) => {
+    if (!errAlter) {
+      // Nếu vừa thêm cột, set tất cả sách = 1 (hiển thị)
+      db.query("UPDATE sach SET an_hien = 1 WHERE an_hien IS NULL OR an_hien = 0", (errUpdate) => {
+        // Bỏ qua lỗi nếu không có dòng nào cần update
+      });
+    }
+  });
+
   const sql = `
-    SELECT sach_id, Loai_sach_id, ten_sach, ten_tac_gia, ten_NXB, gia_sach, ton_kho_sach, mo_ta, gg_sach, loai_bia
+    SELECT sach_id, Loai_sach_id, ten_sach, ten_tac_gia, ten_NXB, gia_sach, ton_kho_sach, mo_ta, gg_sach, loai_bia, COALESCE(an_hien, 1) AS an_hien
     FROM sach
+    ORDER BY sach_id DESC
   `;
   db.query(sql, (err, results) => {
     if (err) {
@@ -530,18 +592,32 @@ app.put("/sachs/:id", (req, res) => {
 });
 
 
-// ✅ API: Xóa sách theo ID
+// ✅ API: Ẩn sách theo ID (không xóa khỏi database)
 app.delete("/sach/:id", (req, res) => {
   const { id } = req.params;
-  const sql = "DELETE FROM sach WHERE sach_id = ?";
+  // Đảm bảo cột an_hien tồn tại
+  db.query("ALTER TABLE sach ADD COLUMN IF NOT EXISTS an_hien INT DEFAULT 1", (errAlter) => {
+    const sql = `UPDATE sach SET an_hien = 0 WHERE sach_id = ?`;
+    db.query(sql, [id], (err, result) => {
+      if (err) {
+        console.error("❌ Lỗi khi ẩn sách:", err.sqlMessage);
+        return res.status(500).json({ message: "Lỗi khi ẩn sách", error: err.sqlMessage });
+      }
+      res.json({ message: "✅ Đã ẩn sách thành công!" });
+    });
+  });
+});
+
+// ✅ API: Khôi phục sách đã ẩn
+app.put("/sach/:id/restore", (req, res) => {
+  const { id } = req.params;
+  const sql = `UPDATE sach SET an_hien = 1 WHERE sach_id = ?`;
   db.query(sql, [id], (err, result) => {
     if (err) {
-      console.error("❌ Lỗi khi xóa:", err.sqlMessage);
-      return res
-        .status(500)
-        .json({ message: "Lỗi khi xóa sách", error: err.sqlMessage });
+      console.error("❌ Lỗi khi khôi phục sách:", err.sqlMessage);
+      return res.status(500).json({ message: "Lỗi khi khôi phục sách", error: err.sqlMessage });
     }
-    res.json({ message: "✅ Đã xóa sách thành công!" });
+    res.json({ message: "✅ Đã khôi phục sách thành công!" });
   });
 });
 
@@ -578,6 +654,7 @@ app.get("/orders", (req, res) => {
       dh.ngay_dat,
       dh.ngay_TT,
       dh.DC_GH,
+      dh.trang_thai, 
       SUM(ct.gia * ct.So_luong) AS tong_tien
     FROM don_hang dh
     LEFT JOIN don_hang_ct ct ON dh.don_hang_id = ct.don_hang_id
@@ -596,83 +673,160 @@ app.get("/orders", (req, res) => {
 
 // ================== API: Tạo đơn hàng ==================
 app.post("/orders", (req, res) => {
-  const { ho_ten, email, phone, address, payment, totalPrice, discount, voucher, products } = req.body;
+  const {
+    ho_ten,
+    email,
+    phone,
+    address,
+    payment,
+    totalPrice,
+    discount,
+    voucher,
+    products,
+    userId,
+  } = req.body;
 
   if (!address || !products || products.length === 0) {
     return res.status(400).json({ error: "Thiếu thông tin đơn hàng" });
   }
 
-  // 🔹 Xác định phương thức thanh toán (giả định: 1 = COD, 2 = Chuyển khoản)
-  const HT_Thanh_toan_id = payment === "cod" ? 1 : 2;
-  const nguoi_dung_id = null; // Chưa đăng nhập
+  const nguoi_dung_id = userId || null;
   const giam_gia_id = voucher ? 1 : null;
+  const HT_Thanh_toan_id =
+    payment === "cod"
+      ? 1
+      : payment === "bank"
+      ? 2
+      : payment === "e-wallet"
+      ? 3
+      : null;
+  const trang_thai = "Chờ xác nhận"; // ✅ thêm trạng thái mặc định
 
-  // 🔹 Câu lệnh thêm đơn hàng (phù hợp với bảng bạn có)
   const sqlOrder = `
-    INSERT INTO don_hang (nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, ngay_dat, DC_GH)
-    VALUES (?, ?, ?, NOW(), ?)
+    INSERT INTO don_hang (nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, ngay_dat, DC_GH, trang_thai)
+    VALUES (?, ?, ?, NOW(), ?, ?)
   `;
 
-  db.query(sqlOrder, [nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, address], (err, result) => {
-    if (err) {
-      console.error("❌ Lỗi khi thêm đơn hàng:", err.sqlMessage);
-      return res.status(500).json({ error: "Không thể thêm đơn hàng" });
-    }
-
-    const don_hang_id = result.insertId;
-    console.log("✅ Đã tạo đơn hàng ID:", don_hang_id);
-
-    // 🔹 Chèn chi tiết đơn hàng
-    const sqlDetail = `
-      INSERT INTO don_hang_ct (don_hang_id, sach_id, So_luong, gia)
-      VALUES ?
-    `;
-
-    const values = products.map((p) => [don_hang_id, p.id, p.quantity, p.price]);
-
-    db.query(sqlDetail, [values], (err2) => {
-      if (err2) {
-        console.error("❌ Lỗi khi thêm chi tiết đơn hàng:", err2.sqlMessage);
-        return res.status(500).json({ error: "Không thể lưu chi tiết đơn hàng" });
+  db.query(
+    sqlOrder,
+    [nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, address, trang_thai],
+    (err, result) => {
+      if (err) {
+        console.error("❌ Lỗi khi thêm đơn hàng:", err.sqlMessage);
+        return res.status(500).json({ error: "Không thể thêm đơn hàng" });
       }
 
-      console.log("✅ Đã lưu chi tiết đơn hàng cho ID:", don_hang_id);
-      res.json({ message: "🎉 Đặt hàng thành công!", orderId: don_hang_id });
+      const don_hang_id = result.insertId;
+      console.log("✅ Đã tạo đơn hàng ID:", don_hang_id);
+
+      const sqlDetail = `
+        INSERT INTO don_hang_ct (don_hang_id, sach_id, So_luong, gia)
+        VALUES ?
+      `;
+      const values = products.map((p) => [
+        don_hang_id,
+        p.id,
+        p.quantity,
+        p.price,
+      ]);
+
+      db.query(sqlDetail, [values], (err2) => {
+        if (err2) {
+          console.error("❌ Lỗi khi thêm chi tiết đơn hàng:", err2.sqlMessage);
+          return res
+            .status(500)
+            .json({ error: "Không thể lưu chi tiết đơn hàng" });
+        }
+
+        console.log("✅ Đã lưu chi tiết đơn hàng cho ID:", don_hang_id);
+        res.status(201).json({
+          message: "🎉 Đặt hàng thành công!",
+          orderId: don_hang_id,
+          total: totalPrice,
+          userId: nguoi_dung_id,
+          status: trang_thai, // ✅ trả trạng thái về frontend
+        });
+      });
+    }
+  );
+});
+
+
+// ✅ API: LẤY CHI TIẾT ĐƠN HÀNG (CÓ HÌNH ẢNH SẢN PHẨM)
+app.get("/orders/:id/details", (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT 
+      dhct.don_hang_id,
+      dhct.sach_id,
+      dhct.So_luong,
+      dhct.gia AS gia_ban,
+      s.ten_sach,
+      h.URL AS image
+    FROM don_hang_ct dhct
+    JOIN sach s ON dhct.sach_id = s.sach_id
+    LEFT JOIN hinh h ON s.sach_id = h.sach_id
+    WHERE dhct.don_hang_id = ?
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error("❌ Lỗi khi truy vấn chi tiết đơn hàng:", err);
+      return res.status(500).json({ message: "Lỗi server khi lấy chi tiết đơn hàng" });
+    }
+    res.json(results);
+  });
+});
+
+// ================== API: Xóa đơn hàng ==================
+app.delete("/orders/:id", (req, res) => {
+  const { id } = req.params;
+
+  const sqlDeleteDetail = `DELETE FROM don_hang_ct WHERE don_hang_id = ?`;
+  const sqlDeleteOrder = `DELETE FROM don_hang WHERE don_hang_id = ?`;
+
+  db.query(sqlDeleteDetail, [id], (err) => {
+    if (err) {
+      console.error("❌ Lỗi khi xóa chi tiết đơn hàng:", err.sqlMessage);
+      return res.status(500).json({ error: "Không thể xóa chi tiết đơn hàng" });
+    }
+
+    db.query(sqlDeleteOrder, [id], (err2) => {
+      if (err2) {
+        console.error("❌ Lỗi khi xóa đơn hàng:", err2.sqlMessage);
+        return res.status(500).json({ error: "Không thể xóa đơn hàng" });
+      }
+
+      res.json({ message: "✅ Đã xóa đơn hàng thành công!" });
     });
   });
 });
 
-// 🔹 Xoá đơn hàng
-app.delete("/orders/:id", (req, res) => {
-  const id = req.params.id;
-  const orders = JSON.parse(fs.readFileSync(dataPath, "utf8"));
 
-  const index = orders.findIndex(o => o.id === id);
-  if (index === -1) {
-    return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+// ✅ Cập nhật trạng thái đơn hàng trong MySQL
+app.put("/orders/:id/status", (req, res) => {
+  const { id } = req.params;
+  const { trang_thai } = req.body;
+
+  if (!trang_thai) {
+    return res.status(400).json({ error: "Thiếu trạng thái đơn hàng" });
   }
 
-  orders.splice(index, 1);
-  fs.writeFileSync(dataPath, JSON.stringify(orders, null, 2));
-  res.json({ message: "Xoá đơn hàng thành công" });
-});
+  const sql = "UPDATE don_hang SET trang_thai = ? WHERE don_hang_id = ?";
+  db.query(sql, [trang_thai, id], (err, result) => {
+    if (err) {
+      console.error("❌ Lỗi cập nhật trạng thái:", err.sqlMessage);
+      return res.status(500).json({ error: "Không thể cập nhật trạng thái" });
+    }
 
-// 🔹 Cập nhật trạng thái đơn hàng
-app.patch("/orders/:id", (req, res) => {
-  const id = req.params.id;
-  const { status } = req.body;
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    }
 
-  const orders = JSON.parse(fs.readFileSync(dataPath, "utf8"));
-  const order = orders.find(o => o.id === id);
-
-  if (!order) {
-    return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-  }
-
-  order.status = status;
-  fs.writeFileSync(dataPath, JSON.stringify(orders, null, 2));
-
-  res.json({ message: "Cập nhật trạng thái thành công", order });
+    console.log(`✅ Cập nhật trạng thái đơn hàng #${id} → ${trang_thai}`);
+    res.json({ message: "Cập nhật thành công", trang_thai });
+  });
 });
 
 
@@ -778,6 +932,129 @@ app.get("/books/:id/images", (req, res) => {
     } else {
       res.json(results);
     }
+  });
+});
+
+//  Sách liên quan cùng loại, loại trừ sách hiện tại
+app.get("/books/related/:categoryId/:bookId", (req, res) => {
+  const { categoryId, bookId } = req.params;
+  const sql = `
+    SELECT s.*, h.URL AS image
+    FROM sach s
+    LEFT JOIN hinh h ON s.sach_id = h.sach_id
+    WHERE s.Loai_sach_id = ? AND s.sach_id <> ?
+    LIMIT 8
+  `;
+  db.query(sql, [categoryId, bookId], (err, results) => {
+    if (err) {
+      console.error("❌ Lỗi lấy sách liên quan:", err);
+      return res.status(500).json({ error: "Lỗi server" });
+    }
+    res.json(results);
+  });
+});
+
+// POST /api/qr  -> gửi payload (json), server trả về dataURL hoặc lưu file
+app.post("/api/qr", async (req, res) => {
+  const payload = req.body.payload;
+  if (!payload) return res.status(400).json({ error: "Missing payload" });
+  try {
+    const dataUrl = await QRCode.toDataURL(JSON.stringify(payload), { width: 400 });
+    // hoặc lưu file: await QRCode.toFile("./path/qr.png", payload, { width: 400 });
+
+    res.json({ dataUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "QR generate failed" });
+  }
+});
+
+// ================== LOẠI SÁCH ==================
+
+// 🟢 Lấy tất cả loại sách
+app.get("/loaisach", (req, res) => {
+  db.query("SELECT * FROM Loai_sach ORDER BY loai_sach_id DESC", (err, results) => {
+    if (err) {
+      console.error("❌ Lỗi truy vấn Loai_sach:", err);
+      return res.status(500).json({ error: "Lỗi truy vấn dữ liệu" });
+    }
+    res.json(results);
+  });
+});
+
+// 🟡 Thêm loại sách
+app.post("/loaisach", (req, res) => {
+  const { ten_loai } = req.body;
+  if (!ten_loai) return res.status(400).json({ error: "Thiếu tên loại" });
+
+  db.query(
+    "INSERT INTO Loai_sach (ten_loai) VALUES (?)",
+    [ten_loai],
+    (err, result) => {
+      if (err) {
+        console.error("❌ Lỗi thêm Loai_sach:", err);
+        return res.status(500).json({ error: "Không thể thêm loại sách" });
+      }
+      res.json({ message: "✅ Thêm loại sách thành công", id: result.insertId });
+    }
+  );
+});
+
+// ✏️ Cập nhật loại sách
+app.put("/loaisach/:id", (req, res) => {
+  const { id } = req.params;
+  const { ten_loai } = req.body;
+
+  db.query(
+    "UPDATE Loai_sach SET ten_loai = ? WHERE loai_sach_id = ?",
+    [ten_loai, id],
+    (err) => {
+      if (err) {
+        console.error("❌ Lỗi cập nhật Loai_sach:", err);
+        return res.status(500).json({ error: "Không thể cập nhật loại sách" });
+      }
+      res.json({ message: "✅ Cập nhật loại sách thành công" });
+    }
+  );
+});
+
+// 🔴 Xóa loại sách
+app.delete("/loaisach/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM Loai_sach WHERE loai_sach_id = ?", [id], (err) => {
+    if (err) {
+      console.error("❌ Lỗi xóa Loai_sach:", err);
+      return res.status(500).json({ error: "Không thể xóa loại sách" });
+    }
+    res.json({ message: "🗑️ Xóa loại sách thành công" });
+  });
+});
+
+// 📘 Lấy danh sách sách theo loại (JOIN với bảng hinh)
+app.get("/loaisach/:id/sach", (req, res) => {
+  const { id } = req.params;
+  const sql = `
+    SELECT 
+      s.sach_id,
+      s.ten_sach,
+      s.ten_tac_gia,
+      s.ten_NXB,
+      s.gia_sach,
+      s.mo_ta,
+      s.loai_bia,
+      h.URL AS hinh_sach
+    FROM sach s
+    LEFT JOIN hinh h ON s.sach_id = h.sach_id
+    WHERE s.Loai_sach_id = ?
+    GROUP BY s.sach_id
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error("❌ Lỗi truy vấn sách theo loại:", err);
+      return res.status(500).json({ error: "Lỗi truy vấn dữ liệu" });
+    }
+    res.json(results);
   });
 });
 
