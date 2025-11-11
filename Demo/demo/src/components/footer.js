@@ -5,7 +5,7 @@ const Footer = () => {
         {/* --- Đăng ký nhận bản tin --- */}
         <div className="text-center mb-4">
           <img
-            src="/image/Grace.png"
+            src="/image/logo chinh.jpg"
             alt="Pibook"
             className="mx-auto my-4"
             style={{ height: "60px", width: "auto", objectFit: "contain" }}

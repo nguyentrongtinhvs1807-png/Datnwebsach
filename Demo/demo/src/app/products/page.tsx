@@ -25,7 +25,7 @@ export default function ProductList() {
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("");
   const [visibleCount, setVisibleCount] = useState(8);
-  
+
   // Filter states
   const [selectedAuthors, setSelectedAuthors] = useState<string[]>([]);
   const [selectedPublishers, setSelectedPublishers] = useState<string[]>([]);
@@ -360,13 +360,13 @@ export default function ProductList() {
                   Xóa bộ lọc
                 </button>
               )}
-            </div>
           </div>
         </div>
+      </div>
 
-        {/* Danh sách sách */}
+      {/* Danh sách sách */}
         <div className="col-lg-9 col-md-8">
-          <div className="row gx-4 gy-5">
+      <div className="row gx-4 gy-5">
         {visibleBooks.map((b) => (
           <div className="col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch" key={b.sach_id}>
             <div
@@ -473,22 +473,74 @@ export default function ProductList() {
                   )}
                 </div>
                 {/* Nút xem chi tiết */}
-                <Link
-                  href={`/products/${b.sach_id}`}
-                  className="btn d-inline-flex align-items-center justify-content-center px-4 fw-bold shadow-sm"
-                  style={{
-                    borderRadius: "30px",
-                    background: "linear-gradient(90deg,#f7ca57 20%,#efb14e 100%)",
-                    border: "none",
-                    color: "#fff",
-                    marginTop: "10px",
-                    fontSize: "1.06rem",
-                    minHeight: "38px",
-                    boxShadow: "0 2px 8px #f5c96b21"
-                  }}
-                >
-                  Xem chi tiết
-                </Link>
+                <div className="d-flex flex-column gap-2 mt-2">
+  <Link
+    href={`/products/${b.sach_id}`}
+    className="btn d-inline-flex align-items-center justify-content-center fw-bold shadow-sm"
+    style={{
+      borderRadius: "30px",
+      background: "linear-gradient(90deg,#f7ca57 20%,#efb14e 100%)",
+      border: "none",
+      color: "#fff",
+      fontSize: "1.05rem",
+      minHeight: "38px",
+      boxShadow: "0 2px 8px #f5c96b21"
+    }}
+  >
+    Xem chi tiết
+  </Link>
+
+  <button
+    onClick={() => {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const existing = cart.find((item: Book) => item.sach_id === b.sach_id);
+      if (existing) {
+        existing.quantity = (existing.quantity || 1) + 1;
+      } else {
+        cart.push({ ...b, quantity: 1 });
+      }
+      localStorage.setItem("cart", JSON.stringify(cart));
+      alert(`🛒 Đã thêm "${b.ten_sach}" vào giỏ hàng!`);
+    }}
+    className="btn fw-bold shadow-sm"
+    style={{
+      borderRadius: "30px",
+      background: "linear-gradient(90deg,#58d68d,#28b463)",
+      border: "none",
+      color: "white",
+      fontSize: "1.05rem",
+      minHeight: "38px"
+    }}
+  >
+    Thêm vào giỏ hàng
+  </button>
+
+  <button
+    onClick={() => {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const existing = cart.find((item: Book) => item.sach_id === b.sach_id);
+      if (existing) {
+        existing.quantity = (existing.quantity || 1) + 1;
+      } else {
+        cart.push({ ...b, quantity: 1 });
+      }
+      localStorage.setItem("cart", JSON.stringify(cart));
+      window.location.href = "/cart"; // ✅ chuyển sang trang giỏ hàng
+    }}
+    className="btn fw-bold shadow-sm"
+    style={{
+      borderRadius: "30px",
+      background: "linear-gradient(90deg,#f06292,#e84393)",
+      border: "none",
+      color: "white",
+      fontSize: "1.05rem",
+      minHeight: "38px"
+    }}
+  >
+    Mua ngay
+  </button>
+</div>
+
               </div>
             </div>
           </div>
@@ -504,28 +556,28 @@ export default function ProductList() {
             <p className="text-muted mt-3 fs-5">Không có sách nào phù hợp với tìm kiếm của bạn.</p>
           </div>
         )}
-          </div>
+      </div>
 
-              {/*  Nút "Xem thêm" */}
-          {visibleCount < filteredBooks.length && (
-            <div className="text-center mt-4">
-              <button
-                className="btn btn-lg py-2 px-5 fw-bold shadow-lg"
-                style={{
-                  borderRadius: "40px",
-                  background: "linear-gradient(90deg, #f7ca57, #efb14e)",
-                  border: "none",
-                  color: "white",
-                  fontSize: "1.15rem",
-                  letterSpacing: 0.7,
-                  boxShadow: "0 2px 15px #f1c40f44"
-                }}
-                onClick={() => setVisibleCount((prev) => prev + 8)}
-              >
-                Xem thêm sách
-              </button>
-            </div>
-          )}
+      {/*  Nút "Xem thêm" */}
+      {visibleCount < filteredBooks.length && (
+        <div className="text-center mt-4">
+          <button
+            className="btn btn-lg py-2 px-5 fw-bold shadow-lg"
+            style={{
+              borderRadius: "40px",
+              background: "linear-gradient(90deg, #f7ca57, #efb14e)",
+              border: "none",
+              color: "white",
+              fontSize: "1.15rem",
+              letterSpacing: 0.7,
+              boxShadow: "0 2px 15px #f1c40f44"
+            }}
+            onClick={() => setVisibleCount((prev) => prev + 8)}
+          >
+            Xem thêm sách
+          </button>
+        </div>
+      )}
         </div>
       </div>
 

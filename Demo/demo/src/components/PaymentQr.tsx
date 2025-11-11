@@ -119,13 +119,13 @@ export default function PaymentQr({
                 Copy nội dung chuyển khoản
               </button>
               {onClose && (
-                <button
+              <button
                   className="btn btn-sm btn-light w-100"
                   onClick={() => onClose()}
                   style={{ borderRadius: "8px" }}
-                >
-                  Đóng
-                </button>
+              >
+                Đóng
+              </button>
               )}
             </div>
           </div>

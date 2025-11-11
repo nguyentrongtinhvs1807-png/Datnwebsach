@@ -12,10 +12,11 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      {children}
-      <BootstrapClient />
-    </>
+    <html lang="vi">
+      <body>
+        {children}
+        <BootstrapClient />
+      </body>
+    </html>
   );
 }
-

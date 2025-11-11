@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Dropdown } from "react-bootstrap";
 
 type UserShape = {
@@ -17,6 +17,7 @@ export default function Header() {
   const [user, setUser] = useState<UserShape | null>(null);
   const [query, setQuery] = useState<string>("");
   const router = useRouter();
+  const pathname = usePathname(); 
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -47,7 +48,11 @@ export default function Header() {
   };
 
   const isAdmin = Boolean(
-    user && (user.role === "admin" || user.vai_tro === "admin" || Number(user.role) === 1 || Number(user.vai_tro) === 1)
+    user &&
+      (user.role === "admin" ||
+        user.vai_tro === "admin" ||
+        Number(user.role) === 1 ||
+        Number(user.vai_tro) === 1)
   );
 
   const onSearchSubmit = (e: React.FormEvent) => {
@@ -56,13 +61,41 @@ export default function Header() {
     router.push(q ? `/products?q=${encodeURIComponent(q)}` : "/products");
   };
 
+  // ✅ Nếu đang ở trang /admin => chỉ hiển thị icon người dùng
+  if (pathname?.startsWith("/admin")) {
+    return (
+      <header className="admin-header p-3 d-flex justify-content-end bg-white border-bottom shadow-sm">
+        {user ? (
+          <Dropdown align="end">
+            <Dropdown.Toggle variant="light" id="dropdown-user" className="user-toggle">
+              <i className="bi bi-person-circle fs-4"></i>
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end">
+              <Dropdown.Item as={Link} href="/account">Tài khoản của tôi</Dropdown.Item>
+              <Dropdown.Item as={Link} href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={handleLogout} className="text-danger">
+                Đăng xuất
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        ) : (
+          <Link href="/auth/dangnhap" className="btn btn-outline-dark btn-sm">
+            Đăng nhập
+          </Link>
+        )}
+      </header>
+    );
+  }
+
+  // ✅ Giao diện header bình thường (ngoài trang admin)
   return (
     <>
       <header className="site-header shadow-sm">
         <div className="container header-inner d-flex align-items-center justify-content-between">
           {/* LOGO */}
           <Link href="/" className="logo d-flex align-items-center text-decoration-none">
-            <img src="/image/Grace.png" alt="Pibook" className="logo-img" />
+            <img src="/image/logo chinh.jpg" alt="Pibook" className="logo-img" />
             <span className="brand-name"></span>
           </Link>
 
@@ -73,7 +106,7 @@ export default function Header() {
             <Link href="/policy" className="nav-link">Chính sách</Link>
             <Link href="/contact" className="nav-link">Liên hệ</Link>
             <Link href="/about" className="nav-link">Giới thiệu</Link>
-            <Link href="/orders" className="nav-link">Đơn hàng Của Bạn</Link>
+            <Link href="/orders" className="nav-link">Đơn hàng của bạn</Link>
           </nav>
 
           {/* SEARCH + USER + CART */}
@@ -110,14 +143,17 @@ export default function Header() {
                       <Dropdown.Item as={Link} href="/account">Tài khoản của tôi</Dropdown.Item>
                       <Dropdown.Item as={Link} href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
                       <Dropdown.Divider />
+                      <Dropdown.Item as={Link} href="/admin" className="text-primary fw-semibold">
+                        🔧 Trang quản trị
+                      </Dropdown.Item>
                     </>
                   ) : (
                     <>
                       <Dropdown.Item as={Link} href="/account">Tài khoản của tôi</Dropdown.Item>
                       <Dropdown.Item as={Link} href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
-                      <Dropdown.Divider />
                     </>
                   )}
+                  <Dropdown.Divider />
                   <Dropdown.Item onClick={handleLogout} className="text-danger">
                     Đăng xuất
                   </Dropdown.Item>
@@ -179,10 +215,11 @@ export default function Header() {
         }
 
         .header-nav .nav-link:hover {
-          background: rgba(255, 193, 7, 0.2); /* vàng nhạt */
-          color: #d4a017; /* vàng đậm */
+          background: rgba(255, 193, 7, 0.2);
+          color: #d4a017;
           transform: translateY(-2px);
         }
+        
 
         /* SEARCH */
         .search-form {

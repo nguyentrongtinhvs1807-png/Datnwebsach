@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import PaymentQr from "@/components/PaymentQr";
 
 type Product = {
@@ -16,7 +16,7 @@ type Discount = {
   code: string;
   value: number;
   type: "percent" | "fixed";
-  maxDiscount?: number; // Giảm tối đa cho mã phần trăm
+  maxDiscount?: number;
 };
 
 export default function CheckoutPage() {
@@ -35,67 +35,8 @@ export default function CheckoutPage() {
   const [isApplying, setIsApplying] = useState(false);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  // Xử lý khi có query params sach_id và soluong (từ nút Mua)
-  useEffect(() => {
-    if (!searchParams) return;
-    const sachId = searchParams.get("sach_id");
-    const soluong = searchParams.get("soluong");
-
-    if (sachId && soluong) {
-      fetch(`http://localhost:3003/books/${sachId}`)
-        .then((res) => res.json())
-        .then((book) => {
-          if (book && book.sach_id) {
-            const finalPrice =
-              book.gg_sach > 0
-                ? Math.max(book.gia_sach - book.gg_sach, 0)
-                : book.gia_sach;
-
-            const newProduct: Product = {
-              id: String(book.sach_id),
-              name: book.ten_sach,
-              price: finalPrice,
-              image: book.image || "/image/default-book.jpg",
-              quantity: parseInt(soluong) || 1,
-            };
-
-            const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
-
-            const existingIndex = currentCart.findIndex(
-              (item: Product) => item.id === newProduct.id
-            );
-
-            if (existingIndex >= 0) {
-              currentCart[existingIndex].quantity += newProduct.quantity;
-            } else {
-              currentCart.push(newProduct);
-            }
-
-            localStorage.setItem("cart", JSON.stringify(currentCart));
-            setCart(currentCart);
-
-            const total = currentCart.reduce(
-              (sum: number, item: Product) => sum + item.price * item.quantity,
-              0
-            );
-            setTotalPrice(total);
-
-            // Reset mã giảm giá khi giỏ hàng thay đổi do mua trực tiếp
-            setAppliedDiscount(null);
-            setDiscountCode("");
-            setDiscountError("");
-
-            router.replace("/checkout", { scroll: false });
-          }
-        })
-        .catch((error) => {
-          console.error("Lỗi khi lấy thông tin sách:", error);
-        });
-    }
-  }, [searchParams, router]);
-
+  // ✅ Ưu tiên lấy checkoutItem (sản phẩm Mua Ngay)
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (!storedUser) {
@@ -103,6 +44,7 @@ export default function CheckoutPage() {
       router.push("/auth/dangnhap");
       return;
     }
+
     try {
       const user = JSON.parse(storedUser);
       if (!user || (!user.id && !user.ten && !user.email)) {
@@ -110,14 +52,24 @@ export default function CheckoutPage() {
         router.push("/auth/dangnhap");
         return;
       }
+
       setCustomer((prev) => ({
         ...prev,
         name: user.ten || user.name || "",
         email: user.email || "",
       }));
 
-      const sachId = searchParams?.get("sach_id");
-      if (!sachId) {
+      // 🟢 Ưu tiên checkoutItem (sản phẩm “Mua Ngay”)
+      const quickBuy = JSON.parse(localStorage.getItem("checkoutItem") || "null");
+      if (quickBuy && Array.isArray(quickBuy) && quickBuy.length > 0) {
+        setCart(quickBuy);
+        const total = quickBuy.reduce(
+          (sum: number, item: Product) => sum + item.price * item.quantity,
+          0
+        );
+        setTotalPrice(total);
+      } else {
+        // 🛒 Nếu không có, fallback về giỏ hàng
         const storedCart = JSON.parse(localStorage.getItem("cart") || "[]");
         setCart(storedCart);
         const total = storedCart.reduce(
@@ -127,19 +79,17 @@ export default function CheckoutPage() {
         setTotalPrice(total);
       }
     } catch (error) {
-      console.error("Lỗi kiểm tra đăng nhập:", error);
-      alert("Lỗi kiểm tra tài khoản. Vui lòng đăng nhập lại!");
+      console.error("Lỗi khi xử lý dữ liệu checkout:", error);
       router.push("/auth/dangnhap");
     }
-  }, [router, searchParams]);
+  }, [router]);
 
-  // Tính tổng tiền đã áp dụng giảm giá (nếu có)
+  // Tính tổng sau giảm giá
   const getFinalPrice = () => {
     if (!appliedDiscount) return totalPrice;
     let discountValue = 0;
     if (appliedDiscount.type === "percent") {
       discountValue = Math.floor((totalPrice * appliedDiscount.value) / 100);
-      // Áp dụng giảm tối đa nếu có
       if (appliedDiscount.maxDiscount && discountValue > appliedDiscount.maxDiscount) {
         discountValue = appliedDiscount.maxDiscount;
       }
@@ -150,7 +100,7 @@ export default function CheckoutPage() {
     return price > 0 ? price : 0;
   };
 
-  // Xử lý áp mã giảm giá
+  // Áp mã giảm giá
   const handleApplyDiscount = async () => {
     setDiscountError("");
     setIsApplying(true);
@@ -160,70 +110,34 @@ export default function CheckoutPage() {
         setIsApplying(false);
         return;
       }
-      // Gọi API kiểm tra mã giảm giá
+
       const res = await fetch(
-        `http://localhost:3003/discount-codes/${encodeURIComponent(discountCode.trim())}`
+        `http://localhost:3003/discount-codes/${encodeURIComponent(
+          discountCode.trim()
+        )}`
       );
       if (!res.ok) {
         setDiscountError("Mã giảm giá không hợp lệ hoặc đã hết hạn!");
-        setAppliedDiscount(null);
         setIsApplying(false);
         return;
       }
+
       const data = await res.json();
-      
-      // Kiểm tra nếu API trả về lỗi
-      if (data.error) {
-        setDiscountError(data.error || "Mã giảm giá không hợp lệ!");
-        setAppliedDiscount(null);
+      if (!data.code) {
+        setDiscountError("Không tìm thấy mã hợp lệ!");
         setIsApplying(false);
         return;
       }
 
-      if (data && data.code) {
-        // Kiểm tra đơn hàng trống
-        if (totalPrice === 0) {
-          setDiscountError("Không thể áp dụng mã cho đơn hàng trống.");
-          setAppliedDiscount(null);
-          setIsApplying(false);
-          return;
-        }
-
-        // Kiểm tra điều kiện đơn tối thiểu
-        const minOrder = Number(data.minOrder || 0);
-        if (minOrder > 0 && totalPrice < minOrder) {
-          setDiscountError(`Đơn hàng tối thiểu ${minOrder.toLocaleString("vi-VN")}đ để sử dụng mã này!`);
-          setAppliedDiscount(null);
-          setIsApplying(false);
-          return;
-        }
-
-        let discountValue = 0;
-        let discountType: "percent" | "fixed" =
-          data.type === "percent" ? "percent" : "fixed";
-        
-        if (discountType === "percent") {
-          // Giá trị là phần trăm (ví dụ: 10 = 10%)
-          discountValue = Math.min(Math.max(Number(data.value), 0), 100);
-        } else {
-          // Giảm giá cố định (ví dụ: 30000 = 30.000đ)
-          discountValue = Math.max(Number(data.value), 0);
-        }
-
-        setAppliedDiscount({
-          code: data.code,
-          value: discountValue,
-          type: discountType,
-          maxDiscount: discountType === "percent" ? Number(data.maxDiscount || 0) : undefined,
-        });
-        setDiscountError("");
-      } else {
-        setDiscountError("Không tìm thấy mã giảm giá hợp lệ!");
-        setAppliedDiscount(null);
-      }
+      setAppliedDiscount({
+        code: data.code,
+        value: Number(data.value),
+        type: data.type === "percent" ? "percent" : "fixed",
+        maxDiscount:
+          data.type === "percent" ? Number(data.maxDiscount || 0) : undefined,
+      });
     } catch (e) {
       setDiscountError("Có lỗi khi kiểm tra mã giảm giá.");
-      setAppliedDiscount(null);
     } finally {
       setIsApplying(false);
     }
@@ -239,6 +153,7 @@ export default function CheckoutPage() {
     if (cart.length === 0) return alert("Giỏ hàng trống!");
     if (!customer.name || !customer.phone || !customer.address || !customer.email)
       return alert("Vui lòng nhập đầy đủ thông tin giao hàng!");
+
     const finalPrice = getFinalPrice();
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const order = {
@@ -251,9 +166,14 @@ export default function CheckoutPage() {
       totalPrice: finalPrice,
       userId: user?.id || null,
       discount: appliedDiscount
-        ? { code: appliedDiscount.code, value: appliedDiscount.value, type: appliedDiscount.type }
+        ? {
+            code: appliedDiscount.code,
+            value: appliedDiscount.value,
+            type: appliedDiscount.type,
+          }
         : undefined,
     };
+
     try {
       const res = await fetch("http://localhost:3003/orders", {
         method: "POST",
@@ -261,8 +181,12 @@ export default function CheckoutPage() {
         body: JSON.stringify(order),
       });
       if (!res.ok) throw new Error("Lỗi khi tạo đơn hàng");
+
+      // ✅ Xóa checkoutItem (hoặc giỏ hàng nếu có)
+      localStorage.removeItem("checkoutItem");
       localStorage.removeItem("cart");
-      alert("Đặt hàng thành công!");
+
+      alert("🎉 Đặt hàng thành công!");
       router.push("/orders");
     } catch (error) {
       console.error("Lỗi khi đặt hàng:", error);
@@ -270,7 +194,9 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setCustomer({ ...customer, [e.target.name]: e.target.value });
   };
 
@@ -280,7 +206,10 @@ export default function CheckoutPage() {
 
   return (
     <div className="checkout-bg min-vh-100 d-flex align-items-center justify-content-center">
-      <div className="checkout-wrapper rounded-4 shadow-lg p-4 p-md-5 bg-white w-100" style={{ maxWidth: 970 }}>
+      <div
+        className="checkout-wrapper rounded-4 shadow-lg p-4 p-md-5 bg-white w-100"
+        style={{ maxWidth: 970 }}
+      >
         <div className="mb-4">
           <button
             onClick={handleGoBack}
@@ -289,17 +218,25 @@ export default function CheckoutPage() {
             Quay lại
           </button>
         </div>
+
         <div className="text-center mb-5">
-          <h1 className="fw-bold text-gradient checkout-title mb-2">Xác nhận & Thanh toán</h1>
+          <h1 className="fw-bold text-gradient checkout-title mb-2">
+            Xác nhận & Thanh toán
+          </h1>
           <div className="checkout-divider mx-auto mb-3"></div>
           <p className="checkout-subtitle">
-            Vui lòng kiểm tra và hoàn thiện các thông tin bên dưới để tiếp tục đặt hàng.
+            Vui lòng kiểm tra và hoàn thiện các thông tin bên dưới để tiếp tục
+            đặt hàng.
           </p>
         </div>
+
         {cart.length === 0 ? (
           <div className="text-center py-5">
             <p className="fs-5">Giỏ hàng của bạn hiện đang trống</p>
-            <a href="/products" className="btn btn-primary px-5 py-2 rounded-3 fw-semibold mt-3">
+            <a
+              href="/products"
+              className="btn btn-primary px-5 py-2 rounded-3 fw-semibold mt-3"
+            >
               Tiếp tục mua sắm
             </a>
           </div>
@@ -307,51 +244,78 @@ export default function CheckoutPage() {
           <div className="row gy-4 gx-3">
             {/* Thông tin giao hàng */}
             <div className="col-lg-6">
-              <div className="bg-light shadow-sm border-0 rounded-4 px-4 py-4 h-100" style={{ minHeight: 440 }}>
-                <h4 className="fw-semibold text-primary mb-4">Thông tin giao hàng</h4>
-                <div className="row">
-                  <div className="col-12 mb-3">
-                    <label className="checkout-label">Họ và tên</label>
-                    <input name="name" value={customer.name} onChange={handleChange} placeholder="Nhập họ và tên" className="form-control checkout-input" />
-                  </div>
-                  <div className="col-12 mb-3">
-                    <label className="checkout-label">Email</label>
-                    <input name="email" value={customer.email} onChange={handleChange} placeholder="Nhập email" className="form-control checkout-input" />
-                  </div>
-                  <div className="col-12 mb-3">
-                    <label className="checkout-label">Số điện thoại</label>
-                    <input
-                      name="phone"
-                      value={customer.phone}
-                      onChange={handleChange}
-                      placeholder="Nhập số điện thoại"
-                      className="form-control checkout-input"
-                      inputMode="tel"
-                      pattern="[0-9+]*"
-                      maxLength={15}
-                    />
-                  </div>
-                  <div className="col-12 mb-3">
-                    <label className="checkout-label">Địa chỉ giao hàng</label>
-                    <input name="address" value={customer.address} onChange={handleChange} placeholder="Nhập địa chỉ" className="form-control checkout-input" />
-                  </div>
-                  <div className="col-12 mb-4">
-                    <label className="checkout-label">Phương thức thanh toán</label>
-                    <select name="payment" value={customer.payment} onChange={handleChange} className="form-select checkout-input">
-                      <option value="cod">Thanh toán khi nhận hàng</option>
-                      <option value="bank">Chuyển khoản qua ngân hàng</option>
-                      <option value="e-wallet">Ví điện tử</option>
-                    </select>
-                  </div>
+              <div className="bg-light shadow-sm border-0 rounded-4 px-4 py-4 h-100">
+                <h4 className="fw-semibold text-primary mb-4">
+                  Thông tin giao hàng
+                </h4>
+
+                <div className="mb-3">
+                  <label className="checkout-label">Họ và tên</label>
+                  <input
+                    name="name"
+                    value={customer.name}
+                    onChange={handleChange}
+                    placeholder="Nhập họ và tên"
+                    className="form-control checkout-input"
+                  />
                 </div>
 
-                {/* Hiển thị mã QR khi chọn chuyển khoản ngân hàng */}
+                <div className="mb-3">
+                  <label className="checkout-label">Email</label>
+                  <input
+                    name="email"
+                    value={customer.email}
+                    onChange={handleChange}
+                    placeholder="Nhập email"
+                    className="form-control checkout-input"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="checkout-label">Số điện thoại</label>
+                  <input
+                    name="phone"
+                    value={customer.phone}
+                    onChange={handleChange}
+                    placeholder="Nhập số điện thoại"
+                    className="form-control checkout-input"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="checkout-label">Địa chỉ giao hàng</label>
+                  <input
+                    name="address"
+                    value={customer.address}
+                    onChange={handleChange}
+                    placeholder="Nhập địa chỉ"
+                    className="form-control checkout-input"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="checkout-label">Phương thức thanh toán</label>
+                  <select
+                    name="payment"
+                    value={customer.payment}
+                    onChange={handleChange}
+                    className="form-select checkout-input"
+                  >
+                    <option value="cod">Thanh toán khi nhận hàng</option>
+                    <option value="bank">Chuyển khoản ngân hàng</option>
+                    <option value="e-wallet">Ví điện tử</option>
+                  </select>
+                </div>
+
                 {customer.payment === "bank" && (
-                  <div className="mt-4 p-4 border rounded" style={{ 
-                    background: "#fffbe8", 
-                    borderColor: "#ffe8b7",
-                    borderRadius: "12px"
-                  }}>
+                  <div
+                    className="mt-4 p-3 border rounded"
+                    style={{
+                      background: "#fffbe8",
+                      borderColor: "#ffe8b7",
+                      borderRadius: "12px",
+                    }}
+                  >
                     <h5 className="fw-bold mb-3" style={{ color: "#d57200" }}>
                       Thông tin chuyển khoản
                     </h5>
@@ -360,22 +324,25 @@ export default function CheckoutPage() {
                       account="0857226757"
                       beneficiary="PIBOOK COMPANY"
                       bankName="Ngân hàng Vietinbank"
-                      note={`Thanh toan don hang PIBOOK - ${customer.name || 'Khach hang'}`}
+                      note={`Thanh toan PIBOOK - ${customer.name || "Khach hang"}`}
                     />
                   </div>
                 )}
               </div>
             </div>
-            {/* Đơn hàng + Mã giảm giá */}
+
+            {/* Đơn hàng */}
             <div className="col-lg-6">
-              <div className="bg-light shadow-sm border-0 rounded-4 px-4 py-4 h-100" style={{ minHeight: 440 }}>
-                <h4 className="fw-semibold text-primary mb-4">Đơn hàng của bạn</h4>
+              <div className="bg-light shadow-sm border-0 rounded-4 px-4 py-4 h-100">
+                <h4 className="fw-semibold text-primary mb-4">
+                  Đơn hàng của bạn
+                </h4>
+
                 <ul className="list-group mb-3">
                   {cart.map((p) => (
                     <li
                       key={p.id}
-                      className="list-group-item d-flex justify-content-between align-items-center border-0 border-bottom bg-transparent px-0 py-2 product-hover-detail"
-                      tabIndex={0}
+                      className="list-group-item d-flex justify-content-between align-items-center border-0 border-bottom bg-transparent px-0 py-2"
                     >
                       <div className="d-flex align-items-center">
                         <img
@@ -383,124 +350,59 @@ export default function CheckoutPage() {
                           alt={p.name}
                           width={53}
                           height={68}
-                          style={{ objectFit: "cover", borderRadius: 8, border: "1px solid #eee", marginRight: 14 }}
+                          style={{
+                            objectFit: "cover",
+                            borderRadius: 8,
+                            border: "1px solid #eee",
+                            marginRight: 14,
+                          }}
                         />
                         <div>
-                          <div className="fw-medium product-title" style={{ fontSize: '16.5px', color: '#253060' }}>{p.name}</div>
-                          <div className="small text-muted">Số lượng: <b>{p.quantity}</b></div>
+                          <div className="fw-medium">{p.name}</div>
+                          <div className="small text-muted">
+                            Số lượng: {p.quantity}
+                          </div>
                         </div>
                       </div>
-                      <span className="fw-bold text-primary order-item-price">
+                      <span className="fw-bold text-primary">
                         {(p.price * p.quantity).toLocaleString("vi-VN")}đ
                       </span>
                     </li>
                   ))}
                 </ul>
-                {/* Tạm tính */}
-                <div className="pt-3 border-top mb-2">
-                  <div
-                    className="d-flex justify-content-between align-items-center mb-2"
-                    style={{ position: "relative" }}
-                  >
-                    <span className="fw-medium d-flex align-items-center">
-                      Tạm tính
-                      <span className="ms-2 info-tooltip-hover"
-                        data-tooltip="Tổng giá trị các sản phẩm trong giỏ, chưa tính giảm giá, phí ship (nếu có)"
-                        tabIndex={0}
-                        style={{
-                          cursor: "pointer",
-                          color: "#ffc107",
-                          fontWeight: 700,
-                          fontSize: "1rem",
-                          padding: "0 3px"
-                        }}
-                      >
-                        <svg width="18" height="18" fill="none" style={{ position: "relative", top: "-1px" }}><circle cx="9" cy="9" r="9" fill="#ffe066" /><text x="9" y="13" textAnchor="middle" fontSize="13" fontWeight="bold" fill="#204" fontFamily="Arial">i</text></svg>
-                        <span className="custom-tooltip">
-                          Tổng giá trị sản phẩm chưa áp dụng giảm giá hoặc phí vận chuyển.
-                        </span>
-                      </span>
-                    </span>
-                    <span className="fw-bold text-dark">{totalPrice.toLocaleString("vi-VN")}đ</span>
+
+                <div className="border-top pt-3">
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="fw-medium">Tạm tính</span>
+                    <span>{totalPrice.toLocaleString("vi-VN")}đ</span>
                   </div>
+
                   {appliedDiscount && (
-                    <div className="d-flex justify-content-between align-items-center fw-medium" style={{ fontSize: "1.03rem" }}>
-                      <span className="text-success d-flex align-items-center">
-                        Giảm giá
-                        {appliedDiscount.code &&
-                          <span className="ms-2 badge bg-primary" style={{fontSize:"0.95rem"}}>{appliedDiscount.code}</span>}
+                    <div className="d-flex justify-content-between mb-2 text-success">
+                      <span>
+                        Giảm giá ({appliedDiscount.code})
                       </span>
-                      <span
-                        className="fw-bold text-success"
-                        style={{ minWidth: 91, textAlign: "right" }}
-                      >
-                        -{appliedDiscount.type === "percent"
-                          ? `${Math.floor((totalPrice * appliedDiscount.value) / 100).toLocaleString("vi-VN")}đ`
-                          : appliedDiscount.value.toLocaleString("vi-VN") + "đ"}
+                      <span>
+                        -{" "}
+                        {appliedDiscount.type === "percent"
+                          ? `${Math.floor(
+                              (totalPrice * appliedDiscount.value) / 100
+                            ).toLocaleString("vi-VN")}đ`
+                          : `${appliedDiscount.value.toLocaleString(
+                              "vi-VN"
+                            )}đ`}
                       </span>
                     </div>
                   )}
-                </div>
-                {/* Mã giảm giá UI - moved below subtotal (tạm tính) */}
-                <div className="mb-3">
-                  <label className="checkout-label">Mã giảm giá</label>
-                  <div className="d-flex align-items-center gap-2 flex-wrap">
-                    <input
-                      type="text"
-                      className="form-control checkout-input"
-                      style={{ maxWidth: 180 }}
-                      placeholder="Nhập mã giảm giá"
-                      value={discountCode}
-                      disabled={!!appliedDiscount}
-                      onChange={e => setDiscountCode(e.target.value.toUpperCase())}
-                      onKeyDown={e => { if (e.key === "Enter" && !appliedDiscount) handleApplyDiscount();}}
-                    />
-                    {appliedDiscount ? (
-                      <button
-                        type="button"
-                        className="btn btn-outline-danger rounded-3 px-3"
-                        onClick={handleRemoveDiscount}
-                        style={{ minWidth: 90 }}
-                      >
-                        Bỏ mã
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-primary rounded-3 px-3"
-                        onClick={handleApplyDiscount}
-                        disabled={isApplying}
-                        style={{ minWidth: 110 }}
-                      >
-                        {isApplying ? "Đang kiểm tra..." : "Áp dụng"}
-                      </button>
-                    )}
-                    {appliedDiscount && (
-                      <span className="ms-2 badge bg-success px-3 py-2" style={{ fontSize: '1rem' }}>
-                        {appliedDiscount.type === "percent"
-                          ? `-${appliedDiscount.value}%`
-                          : `- ${appliedDiscount.value.toLocaleString("vi-VN")}đ`}
-                        <span className="ms-1">({appliedDiscount.code})</span>
-                      </span>
-                    )}
+
+                  <div className="d-flex justify-content-between border-top pt-2 fw-bold fs-5">
+                    <span>Tổng thanh toán</span>
+                    <span>{getFinalPrice().toLocaleString("vi-VN")}đ</span>
                   </div>
-                  <div className="mt-1" style={{ minHeight: 22 }}>
-                    {discountError && (
-                      <span className="text-danger" style={{ fontSize: "0.98rem"}}>{discountError}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="d-flex justify-content-between align-items-center mt-3 border-top pt-3">
-                  <span className="fw-semibold fs-5" style={{ color: "#21409A" }}>
-                    Tổng thanh toán
-                  </span>
-                  <span className="fw-bold fs-4 text-gradient">
-                    {getFinalPrice().toLocaleString("vi-VN")}đ
-                  </span>
                 </div>
 
                 <button
-                  className="btn btn-success w-100 mt-4 py-3 fw-bold fs-5 checkout-btn rounded-3"
+                  className="btn btn-success w-100 mt-4 py-3 fw-bold"
                   onClick={handleCheckout}
                 >
                   Xác nhận đặt hàng

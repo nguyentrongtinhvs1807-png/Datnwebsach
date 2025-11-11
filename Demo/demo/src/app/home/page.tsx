@@ -88,6 +88,37 @@ export default function Home() {
       });
   }, []);
 
+  // Thêm vào giỏ hàng - lưu localStorage và chuyển đến /cart
+  const handleAddToCart = (book: Book) => {
+    try {
+      // Lấy cart hiện tại
+      const cartStr = localStorage.getItem("cart");
+      let cart = cartStr ? JSON.parse(cartStr) : [];
+      if (!Array.isArray(cart)) cart = [];
+      // Kiểm tra đã có sách chưa, nếu có tăng số lượng, chưa có thì thêm mới
+      const existedIndex = cart.findIndex(
+        (item: any) => item.sach_id === book.sach_id
+      );
+      if (existedIndex >= 0) {
+        cart[existedIndex].quantity += 1;
+      } else {
+        cart.push({
+          sach_id: book.sach_id,
+          ten_sach: book.ten_sach,
+          price: book.gia_sach,
+          image: book.image,
+          quantity: 1,
+          ten_tac_gia: book.ten_tac_gia,
+          gg_sach: book.gg_sach
+        });
+      }
+      localStorage.setItem("cart", JSON.stringify(cart));
+      router.push("/cart");
+    } catch (err) {
+      alert("Không thể thêm vào giỏ hàng. Thử lại sau!");
+    }
+  };
+
   const uniqueBooks = Array.from(
     new Map(books.map((book) => [book.sach_id, book])).values()
   );
@@ -107,6 +138,7 @@ export default function Home() {
       router.push("/auth/dangnhap");
       return;
     }
+  
     try {
       const user = JSON.parse(storedUser);
       if (!user || (!user.id && !user.ten && !user.email)) {
@@ -114,13 +146,28 @@ export default function Home() {
         router.push("/auth/dangnhap");
         return;
       }
-      router.push(`/checkout?sach_id=${book.sach_id}&soluong=1`);
+  
+      //  Lưu sản phẩm được mua ngay vào localStorage riêng
+      const quickBuy = [
+        {
+          sach_id: book.sach_id,
+          ten_sach: book.ten_sach,
+          price: book.gia_sach - (book.gg_sach || 0),
+          image: book.image,
+          quantity: 1,
+          ten_tac_gia: book.ten_tac_gia,
+        },
+      ];
+      localStorage.setItem("checkoutItem", JSON.stringify(quickBuy));
+  
+      //  Chuyển sang trang thanh toán
+      router.push("/checkout");
     } catch (error) {
-      console.error("Lỗi kiểm tra đăng nhập:", error);
-      alert("⚠️ Lỗi kiểm tra tài khoản. Vui lòng đăng nhập lại!");
-      router.push("/auth/dangnhap");
+      console.error("❌ Lỗi khi xử lý mua ngay:", error);
+      alert("⚠️ Đã có lỗi xảy ra, vui lòng thử lại!");
     }
   };
+  
 
   // Helper: format discount for UI - format số nguyên không có .00
   const formatDiscount = (discount: Discount) => {
@@ -163,117 +210,159 @@ export default function Home() {
   return (
     <>
       {/* ======== HEADER & SEARCH ======== */}
-      <Container fluid className="py-2 px-lg-5 px-md-3 hero-bg" style={{
-        background: "linear-gradient(90deg, #ffd976 0%, #ffeacb 100%)",
-        borderRadius: "24px",
-        marginTop: "24px",
-        boxShadow: "0 8px 36px rgba(255,193,7,0.18)"
-      }}>
-        <Row className="align-items-center">
-          <Col xs={12} md={6} className="mb-4 mb-md-0">
-            <h1 className="display-4 fw-bold mb-3" style={{ color: "#222" }}>
-              Chào mừng bạn đến với <span style={{
-                color: "#d97706"
-              }}>Pibbok</span>
-            </h1>
-            <p className="lead" style={{ color: "#565656" }}>
-              Nền tảng mua sách trực tuyến thông minh. Tìm kiếm, chọn lựa và tận hưởng sách mỗi ngày!
-            </p>
-            <InputGroup className="my-4 w-75" style={{ maxWidth: 400 }}>
-              <FormControl
-                placeholder="Tìm tên sách, tác giả, ..."
-                value={keyword}
-                onChange={e => setKeyword(e.target.value)}
-                style={{
-                  borderTopLeftRadius: "24px",
-                  borderBottomLeftRadius: "24px",
-                  borderRight: "none",
-                  fontSize: 16,
-                  boxShadow: "0 2px 8px 0 rgba(255,193,7,0.07)"
-                }}
-              />
-              <Button
-                variant="warning"
-                style={{
-                  borderTopRightRadius: "24px",
-                  borderBottomRightRadius: "24px",
-                  fontWeight: 600
-                }}
-              >
-                Tìm kiếm
-              </Button>
-            </InputGroup>
-            <div className="d-flex flex-wrap gap-2 mt-2">
-              {categories.slice(0, 8).map(c => (
-                <Badge
-                  key={c.loai_sach_id}
-                  bg="light"
-                  text="dark"
-                  style={{
-                    border: "1px solid #ffd346",
-                    borderRadius: 20,
-                    padding: "8px 16px",
-                    cursor: "pointer",
-                    fontWeight: 500,
-                    background: "linear-gradient(90deg, #fffde4, #fff6ba)"
-                  }}
-                  onClick={() => router.push(`/category/${c.loai_sach_id}`)}
-                >
-                  {c.ten_loai}
-                </Badge>
-              ))}
-            </div>
-          </Col>
-          <Col xs={12} md={6}>
-            <div className="position-relative hero-banner mx-auto d-flex justify-content-center align-items-center" style={{ maxWidth: "440px" }}>
-              <div
-                className="rounded-4 shadow-sm d-flex justify-content-center align-items-center"
-                style={{
-                  width: "100%",
-                  minHeight: "300px",
-                  background: "linear-gradient(135deg, #fffbe6 0%, #ffe8b3 100%)",
-                  border: "2px solid #ffe8b3",
-                  borderRadius: "2rem"
-                }}
-              >
-                <span style={{
-                  color: "#222",
-                  fontSize: "1.1rem",
-                  fontWeight: 500,
-                  opacity: 0.7
-                }}>
-                  Pibook Hero Banner
-                </span>
-              </div>
-            </div>
-          </Col>
-        </Row>
-      </Container>
+      <Container
+  fluid
+  className="py-2 px-lg-5 px-md-3 hero-bg"
+  style={{
+    background: "linear-gradient(90deg, #ffd976 0%, #ffeacb 100%)",
+    borderRadius: "24px",
+    marginTop: "24px",
+    boxShadow: "0 8px 36px rgba(255,193,7,0.18)"
+  }}
+>
+  <Row className="align-items-center">
+    {/* Cột bên trái */}
+    <Col xs={12} md={6} className="mb-4 mb-md-0">
+      <h1
+        className="display-4 fw-bold mb-3"
+        style={{ color: "#222" }}
+      >
+        Chào mừng bạn đến với{" "}
+        <span style={{ color: "#d97706" }}>Pibbok</span>
+      </h1>
+      <p className="lead" style={{ color: "#565656" }}>
+        Nền tảng mua sách trực tuyến thông minh. Tìm kiếm, chọn lựa
+        và tận hưởng sách mỗi ngày!
+      </p>
 
+      <InputGroup className="my-4 w-75" style={{ maxWidth: 400 }}>
+        <FormControl
+          placeholder="Tìm tên sách, tác giả, ..."
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          style={{
+            borderTopLeftRadius: "24px",
+            borderBottomLeftRadius: "24px",
+            borderRight: "none",
+            fontSize: 16,
+            boxShadow: "0 2px 8px 0 rgba(255,193,7,0.07)"
+          }}
+        />
+        <Button
+          variant="warning"
+          style={{
+            borderTopRightRadius: "24px",
+            borderBottomRightRadius: "24px",
+            fontWeight: 600
+          }}
+        >
+          Tìm kiếm
+        </Button>
+      </InputGroup>
+
+      {/* Danh sách thể loại */}
+      <div className="d-flex flex-wrap gap-2 mt-2">
+        {categories.slice(0, 8).map((c) => (
+          <Badge
+            key={c.loai_sach_id}
+            bg="light"
+            text="dark"
+            style={{
+              border: "1px solid #ffd346",
+              borderRadius: 20,
+              padding: "8px 16px",
+              cursor: "pointer",
+              fontWeight: 500,
+              background: "linear-gradient(90deg, #fffde4, #fff6ba)"
+            }}
+            onClick={() => router.push(`/category/${c.loai_sach_id}`)}
+          >
+            {c.ten_loai}
+          </Badge>
+        ))}
+      </div>
+    </Col>
+
+    {/* Cột bên phải (ảnh banner) */}
+    <Col xs={12} md={6}>
+      <div
+        className="position-relative hero-banner mx-auto overflow-hidden shadow-sm"
+        style={{
+          maxWidth: "440px",
+          borderRadius: "2rem",
+          border: "2px solid #ffe8b3",
+          transition: "transform 0.4s ease, box-shadow 0.4s ease"
+        }}
+      >
+        <img
+          src="/image/images (11).jpeg" 
+          alt="Pibook Banner"
+          style={{
+            width: "100%",
+            height: "250px",
+            objectFit: "cover",
+            borderRadius: "2rem"
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = "scale(1.03)";
+            e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.1)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        />
+      </div>
+    </Col>
+  </Row>
+</Container>
       {/* ======= DANH MỤC & BANNER ======= */}
       <Container className="my-5">
         <Row className="gx-4">
-          <Col xs={12} md={3} className="d-flex flex-column gap-3">
-            {["abc.jpg", "abcd.jpg"].map((img, i) => (
-              <div
-                key={i}
-                className="rounded-4 shadow-sm bg-light overflow-hidden"
-                style={{ minHeight: 180, border: "2px solid #fff0b7" }}
-              >
-                <img
-                  src={`/image/${img}`}
-                  alt={`Banner nhỏ ${i + 1}`}
-                  className="w-100 h-100"
-                  style={{
-                    objectFit: "cover",
-                    height: "190px",
-                    borderRadius: "2rem",
-                    transition: "transform 0.5s cubic-bezier(.19,1,.22,1)",
-                  }}
-                />
-              </div>
-            ))}
-          </Col>
+        <Col xs={12} md={3} className="d-flex flex-column gap-3">
+    {[
+      { img: "abc.jpg", link: "https://nigioikhatsi.net/kinhsach-pdf/Duong%20Xua%20May%20Trang.pdf" },
+      { img: "114.jpg", link: "https://vnexpress.net/giai-tri/sach/diem-sach" },
+    ].map((item, i) => (
+      <a
+        key={i}
+        href={item.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-decoration-none"
+      >
+        <div
+          className="rounded-4 shadow-sm bg-light overflow-hidden"
+          style={{
+            minHeight: 180,
+            border: "2px solid #fff0b7",
+            transition: "transform 0.4s ease, box-shadow 0.4s ease",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.transform = "scale(1.02)";
+            (e.currentTarget as HTMLElement).style.boxShadow =
+              "0 10px 25px rgba(0,0,0,0.1)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+            (e.currentTarget as HTMLElement).style.boxShadow = "none";
+          }}
+        >
+          <img
+            src={`/image/${item.img}`}
+            alt={`Banner nhỏ ${i + 1}`}
+            className="w-100 h-100"
+            style={{
+              objectFit: "cover",
+              height: "190px",
+              borderRadius: "2rem",
+              transition: "transform 0.5s cubic-bezier(.19,1,.22,1)",
+            }}
+          />
+        </div>
+      </a>
+    ))}
+  </Col>
           <Col xs={12} md={9}>
             <div className="banner-lg-container rounded-4 shadow-lg position-relative overflow-hidden" style={{
               height: "410px",
@@ -580,295 +669,471 @@ export default function Home() {
         )}
       </Container>
 
-      {/* ========= SÁCH MỚI & SÁCH GIẢM GIÁ ======== */}
-      <Container className="mt-5 mb-5">
-        <h2 className="section-title mb-4 text-center fw-bold" style={{
-          color: "#029e74",
-          letterSpacing: ".04em"
-        }}>
-          Ưu đãi & Sách mới nổi bật
-        </h2>
-        <Row className="gy-4 align-items-stretch">
-          {/* SÁCH MỚI nổi bật - chỉnh lại bố cục giống sách giảm giá */}
-          <Col xs={12}>
-            <h4 className="fw-bold text-success text-center mb-3" style={{letterSpacing:"0.02em"}}>Sách mới nổi bật</h4>
-            <Row>
-              {filteredBooks.length > 0 ? (
-                filteredBooks.slice(12, 20).map((book, index) => {
-                  const hasDiscount = book.gg_sach > 0;
-                  const finalPrice = hasDiscount
-                    ? Math.max(book.gia_sach - book.gg_sach, 0)
-                    : book.gia_sach;
-                  return (
-                    <Col key={`book-${book.sach_id}-${index}`} xs={12} sm={6} md={4} lg={3} className="mb-4 d-flex">
-                      <Card
-                        className="product-card shadow border-0 flex-fill"
-                        style={{
-                          borderRadius: "1.5rem",
-                          transition: "all 0.22s cubic-bezier(.19,1,.22,1)",
-                          background: "#fff7e2",
-                          cursor: "pointer",
-                          position: "relative"
-                        }}
-                        onMouseOver={(e) => (e.currentTarget.style.transform = "translateY(-7px) scale(1.03)")}
-                        onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                        onClick={() => router.push(`/products/${book.sach_id}`)}
-                      >
-                        <div className="position-relative">
-                          <Card.Img
-                            variant="top"
-                            src={book.image || "/image/default-book.jpg"}
-                            alt={book.ten_sach}
-                            className="p-3"
-                            style={{
-                              height: "200px",
-                              objectFit: "contain",
-                              borderRadius: "1rem",
-                              background: "#fff",
-                              boxShadow: "0 2px 12px #ffd07e40",
-                            }}
-                          />
-                          {hasDiscount && (
-                            <span
-                              className="badge bg-danger position-absolute top-0 end-0 m-2"
-                              style={{
-                                fontSize: "0.85rem",
-                                borderRadius: "0.8rem",
-                                padding: "7px 15px",
-                                background: "linear-gradient(90deg, #fb5a36 70%, #ffb95a 100%)"
-                              }}
-                            >
-                              -{Math.round(book.gg_sach).toLocaleString("vi-VN")}đ
-                            </span>
-                          )}
-                        </div>
-                        <Card.Body className="pt-2 pb-3 text-center d-flex flex-column">
-                          <Card.Title className="fw-bold mb-1 text-dark" style={{ fontSize: "1.1rem", minHeight: 38 }}>{book.ten_sach}</Card.Title>
-                          <Card.Text className="text-muted mb-2" style={{ fontSize: ".98rem" }}>
-                            {book.ten_tac_gia}
-                          </Card.Text>
-                          {hasDiscount ? (
-                            <>
-                              <h5 className="text-danger fw-bold mb-0">{finalPrice.toLocaleString("vi-VN")}đ</h5>
-                              <div className="text-decoration-line-through text-secondary mb-2" style={{ fontSize: ".96rem" }}>
-                                {book.gia_sach.toLocaleString("vi-VN")}đ
-                              </div>
-                            </>
-                          ) : (
-                            <h5 className="text-primary mb-2">{formatPrice(book.gia_sach)}</h5>
-                          )}
-                          <div className="d-flex gap-2 justify-content-center mt-auto">
-                            <Button
-                              variant="warning"
-                              style={{
-                                borderRadius: "20px",
-                                minWidth: "90px",
-                                fontWeight: 500
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/products/${book.sach_id}`);
-                              }}
-                            >
-                              Xem
-                            </Button>
-                            <Button
-                              variant="danger"
-                              style={{
-                                borderRadius: "20px",
-                                minWidth: "90px",
-                                fontWeight: 500,
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleBuyNow(book);
-                              }}
-                            >
-                              Mua
-                            </Button>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  );
-                })
-              ) : (
-                <p className="text-center text-muted">Không có sách nào để hiển thị</p>
-              )}
-            </Row>
-          </Col>
-        </Row>
-      </Container>
-      {/* Sách giảm giá riêng, đẹp */}
-      <Container className="mt-5 mb-5">
-        <h2 className="section-title mb-4 text-center fw-bold text-danger" style={{
-          letterSpacing: ".03em"
-        }}>
-          Sách giảm giá HOT
-        </h2>
-        <Row>
-          {
-            filteredBooks.filter(book => book.gg_sach > 0).slice(0, 8).map((book, index) => {
-              const finalPrice = Math.max(book.gia_sach - book.gg_sach, 0);
+{/* ========= SÁCH MỚI & SÁCH GIẢM GIÁ ======== */}
+  <Container className="mt-5 mb-5">
+  <h2
+    className="section-title mb-4 text-center fw-bold"
+    style={{
+      color: "#029e74",
+      letterSpacing: ".04em",
+    }}
+  >
+    Ưu đãi & Sách mới nổi bật
+  </h2>
+
+  <Row className="gy-4 align-items-stretch">
+    {/* SÁCH MỚI NỔI BẬT */}
+    <Col xs={12}>
+      <h4
+        className="fw-bold text-success text-center mb-3"
+        style={{ letterSpacing: "0.02em" }}
+      >
+        Sách mới nổi bật
+      </h4>
+
+      <Row>
+        {filteredBooks.length > 0 ? (
+          filteredBooks.slice(12, 20).map((book, index) => {
+            const hasDiscount = book.gg_sach > 0;
+            const finalPrice = hasDiscount
+              ? Math.max(book.gia_sach - book.gg_sach, 0)
+              : book.gia_sach;
+
+            //  Hàm định dạng giá kiểu Việt Nam (chuẩn, bỏ .00)
+            const formatVietnamesePrice = (price: number | string) => {
+              const num =
+                typeof price === "string" ? parseFloat(price) : price;
+              if (isNaN(num)) return "0đ";
               return (
-                <Col key={`discount-${book.sach_id}-${index}`} xs={12} sm={6} md={4} lg={3} className="mb-4 d-flex">
-                  <Card
-                    className="product-card shadow border-0 flex-fill"
-                    style={{
-                      borderRadius: "1.5rem",
-                      transition: "all 0.22s cubic-bezier(.19,1,.22,1)",
-                      background: "#fff7e2",
-                      cursor: "pointer",
-                      position: "relative"
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.transform = "translateY(-7px) scale(1.03)")}
-                    onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                    onClick={() => router.push(`/products/${book.sach_id}`)}
-                  >
-                    <div className="position-relative">
-                      <Card.Img
-                        variant="top"
-                        src={book.image || "/image/default-book.jpg"}
-                        alt={book.ten_sach}
-                        className="p-3"
-                        style={{
-                          height: "200px",
-                          objectFit: "contain",
-                          borderRadius: "1rem",
-                          background: "#fff",
-                          boxShadow: "0 2px 12px #ffd07e40",
-                        }}
-                      />
+                num.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ"
+              );
+            };
+
+            return (
+              <Col
+                key={`book-${book.sach_id}-${index}`}
+                xs={12}
+                sm={6}
+                md={4}
+                lg={3}
+                className="mb-4 d-flex"
+              >
+                <Card
+                  className="product-card shadow border-0 flex-fill"
+                  style={{
+                    borderRadius: "1.5rem",
+                    transition: "all 0.22s cubic-bezier(.19,1,.22,1)",
+                    background: "#fff7e2",
+                    cursor: "pointer",
+                    position: "relative",
+                  }}
+                  onMouseOver={(e) =>
+                    (e.currentTarget.style.transform =
+                      "translateY(-7px) scale(1.03)")
+                  }
+                  onMouseOut={(e) =>
+                    (e.currentTarget.style.transform = "scale(1)")
+                  }
+                  onClick={() => router.push(`/products/${book.sach_id}`)}
+                >
+                  <div className="position-relative">
+                    <Card.Img
+                      variant="top"
+                      src={book.image || "/image/default-book.jpg"}
+                      alt={book.ten_sach}
+                      className="p-3"
+                      style={{
+                        height: "200px",
+                        objectFit: "contain",
+                        borderRadius: "1rem",
+                        background: "#fff",
+                        boxShadow: "0 2px 12px #ffd07e40",
+                      }}
+                    />
+                    {hasDiscount && (
                       <span
                         className="badge bg-danger position-absolute top-0 end-0 m-2"
                         style={{
                           fontSize: "0.85rem",
                           borderRadius: "0.8rem",
                           padding: "7px 15px",
-                          background: "linear-gradient(90deg, #fb5a36 70%, #ffb95a 100%)"
+                          background:
+                            "linear-gradient(90deg, #fb5a36 70%, #ffb95a 100%)",
                         }}
                       >
-                        -{Math.round(book.gg_sach).toLocaleString("vi-VN")}đ
+                        -{formatVietnamesePrice(Math.round(book.gg_sach))}
                       </span>
-                    </div>
-                    <Card.Body className="pt-2 pb-3 text-center d-flex flex-column">
-                      <Card.Title className="fw-bold mb-1 text-dark" style={{ fontSize: "1.1rem", minHeight: 38 }}>{book.ten_sach}</Card.Title>
-                      <Card.Text className="text-muted mb-2" style={{ fontSize: ".98rem" }}>
-                        {book.ten_tac_gia}
-                      </Card.Text>
-                      <h5 className="text-danger fw-bold mb-0">{finalPrice.toLocaleString("vi-VN")}đ</h5>
-                      <div className="text-decoration-line-through text-secondary mb-2" style={{ fontSize: ".96rem" }}>
-                        {book.gia_sach.toLocaleString("vi-VN")}đ
-                      </div>
-                      <div className="d-flex gap-2 justify-content-center mt-auto">
-                        <Button
-                          variant="warning"
-                          style={{
-                            borderRadius: "20px",
-                            minWidth: "90px",
-                            fontWeight: 500
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/products/${book.sach_id}`);
-                          }}
-                        >
-                          Xem
-                        </Button>
-                        <Button
-                          variant="danger"
-                          style={{
-                            borderRadius: "20px",
-                            minWidth: "90px",
-                            fontWeight: 500,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBuyNow(book);
-                          }}
-                        >
-                          Mua
-                        </Button>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              );
-            })
-          }
-        </Row>
-      </Container>
+                    )}
+                  </div>
 
-      {/* ========== ABOUT & NEWS ========== */}
+                  <Card.Body className="pt-2 pb-3 text-center d-flex flex-column">
+                    <Card.Title
+                      className="fw-bold mb-1 text-dark"
+                      style={{ fontSize: "1.1rem", minHeight: 38 }}
+                    >
+                      {book.ten_sach}
+                    </Card.Title>
+
+                    <Card.Text
+                      className="text-muted mb-2"
+                      style={{ fontSize: ".98rem" }}
+                    >
+                      {book.ten_tac_gia}
+                    </Card.Text>
+
+                    {hasDiscount ? (
+                      <>
+                        <h5 className="text-danger fw-bold mb-0">
+                          {formatVietnamesePrice(finalPrice)}
+                        </h5>
+                        <div
+                          className="text-decoration-line-through text-secondary mb-2"
+                          style={{ fontSize: ".96rem" }}
+                        >
+                          {formatVietnamesePrice(book.gia_sach)}
+                        </div>
+                      </>
+                    ) : (
+                      <h5 className="text-primary mb-2">
+                        {formatVietnamesePrice(book.gia_sach)}
+                      </h5>
+                    )}
+
+                    <div className="d-flex gap-2 justify-content-center mt-auto flex-wrap">
+                      <Button
+                        variant="warning"
+                        style={{
+                          borderRadius: "20px",
+                          minWidth: "90px",
+                          fontWeight: 500,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/products/${book.sach_id}`);
+                        }}
+                      >
+                        Xem Chi Tiết
+                      </Button>
+                      <Button
+                        variant="danger"
+                        style={{
+                          borderRadius: "20px",
+                          minWidth: "90px",
+                          fontWeight: 500,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBuyNow(book);
+                        }}
+                      >
+                        Mua Ngay !
+                      </Button>
+                      <Button
+                        variant="success"
+                        style={{
+                          borderRadius: "20px",
+                          minWidth: "90px",
+                          fontWeight: 500,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(book);
+                        }}
+                      >
+                        Thêm Vào Giỏ hàng
+                      </Button>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            );
+          })
+        ) : (
+          <p className="text-center text-muted">
+            Không có sách nào để hiển thị
+          </p>
+        )}
+      </Row>
+    </Col>
+  </Row>
+</Container>
+      {/* Sách giảm giá riêng, đẹp */}
+      <Container className="mt-5 mb-5">
+  <h2
+    className="section-title mb-4 text-center fw-bold"
+    style={{
+      color: "#029e74",
+      letterSpacing: ".04em",
+    }}
+  >
+    Ưu đãi & Sách mới nổi bật
+  </h2>
+
+  <Row className="gy-4 align-items-stretch">
+    {/* SÁCH MỚI NỔI BẬT */}
+    <Col xs={12}>
+      <h4
+        className="fw-bold text-success text-center mb-3"
+        style={{ letterSpacing: "0.02em" }}
+      >
+        Sách giảm giá
+      </h4>
+
+      <Row>
+        {filteredBooks.length > 0 ? (
+          filteredBooks.slice(0, 8).map((book, index) => {
+            const hasDiscount = book.gg_sach > 0;
+            const finalPrice = hasDiscount
+              ? Math.max(book.gia_sach - book.gg_sach, 0)
+              : book.gia_sach;
+
+            //  Hàm định dạng giá kiểu Việt Nam (chuẩn, bỏ .00)
+            const formatVietnamesePrice = (price: number | string) => {
+              const num =
+                typeof price === "string" ? parseFloat(price) : price;
+              if (isNaN(num)) return "0đ";
+              return (
+                num.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ"
+              );
+            };
+
+            return (
+              <Col
+                key={`book-${book.sach_id}-${index}`}
+                xs={12}
+                sm={6}
+                md={4}
+                lg={3}
+                className="mb-4 d-flex"
+              >
+                <Card
+                  className="product-card shadow border-0 flex-fill"
+                  style={{
+                    borderRadius: "1.5rem",
+                    transition: "all 0.22s cubic-bezier(.19,1,.22,1)",
+                    background: "#fff7e2",
+                    cursor: "pointer",
+                    position: "relative",
+                  }}
+                  onMouseOver={(e) =>
+                    (e.currentTarget.style.transform =
+                      "translateY(-7px) scale(1.03)")
+                  }
+                  onMouseOut={(e) =>
+                    (e.currentTarget.style.transform = "scale(1)")
+                  }
+                  onClick={() => router.push(`/products/${book.sach_id}`)}
+                >
+                  <div className="position-relative">
+                    <Card.Img
+                      variant="top"
+                      src={book.image || "/image/default-book.jpg"}
+                      alt={book.ten_sach}
+                      className="p-3"
+                      style={{
+                        height: "200px",
+                        objectFit: "contain",
+                        borderRadius: "1rem",
+                        background: "#fff",
+                        boxShadow: "0 2px 12px #ffd07e40",
+                      }}
+                    />
+                    {hasDiscount && (
+                      <span
+                        className="badge bg-danger position-absolute top-0 end-0 m-2"
+                        style={{
+                          fontSize: "0.85rem",
+                          borderRadius: "0.8rem",
+                          padding: "7px 15px",
+                          background:
+                            "linear-gradient(90deg, #fb5a36 70%, #ffb95a 100%)",
+                        }}
+                      >
+                        -{formatVietnamesePrice(Math.round(book.gg_sach))}
+                      </span>
+                    )}
+                  </div>
+
+                  <Card.Body className="pt-2 pb-3 text-center d-flex flex-column">
+                    <Card.Title
+                      className="fw-bold mb-1 text-dark"
+                      style={{ fontSize: "1.1rem", minHeight: 38 }}
+                    >
+                      {book.ten_sach}
+                    </Card.Title>
+
+                    <Card.Text
+                      className="text-muted mb-2"
+                      style={{ fontSize: ".98rem" }}
+                    >
+                      {book.ten_tac_gia}
+                    </Card.Text>
+
+                    {hasDiscount ? (
+                      <>
+                        <h5 className="text-danger fw-bold mb-0">
+                          {formatVietnamesePrice(finalPrice)}
+                        </h5>
+                        <div
+                          className="text-decoration-line-through text-secondary mb-2"
+                          style={{ fontSize: ".96rem" }}
+                        >
+                          {formatVietnamesePrice(book.gia_sach)}
+                        </div>
+                      </>
+                    ) : (
+                      <h5 className="text-primary mb-2">
+                        {formatVietnamesePrice(book.gia_sach)}
+                      </h5>
+                    )}
+
+                    <div className="d-flex gap-2 justify-content-center mt-auto flex-wrap">
+                      <Button
+                        variant="warning"
+                        style={{
+                          borderRadius: "20px",
+                          minWidth: "90px",
+                          fontWeight: 500,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/products/${book.sach_id}`);
+                        }}
+                      >
+                        Xem Chi Tiết
+                      </Button>
+                      <Button
+                        variant="danger"
+                        style={{
+                          borderRadius: "20px",
+                          minWidth: "90px",
+                          fontWeight: 500,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBuyNow(book);
+                        }}
+                      >
+                        Mua Ngay !
+                      </Button>
+                      <Button
+                        variant="success"
+                        style={{
+                          borderRadius: "20px",
+                          minWidth: "90px",
+                          fontWeight: 500,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(book);
+                        }}
+                      >
+                        Thêm vào Giỏ hàng
+                      </Button>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            );
+          })
+        ) : (
+          <p className="text-center text-muted">
+            Không có sách nào để hiển thị
+          </p>
+        )}
+      </Row>
+    </Col>
+  </Row>
+</Container>
+
+{/* ========== ABOUT & NEWS ========== */}
       <AboutBookbuy />
-      {/* ================ News Section ================ */}
-      <Container className="my-5">
-        <h2 className="section-title fw-bold text-center" style={{
+{/* ================ News Section ================ */}
+<Container className="my-5">
+      <h2
+        className="section-title fw-bold text-center"
+        style={{
           color: "#01977d",
           fontSize: "1.8rem",
-          letterSpacing: ".03em"
-        }}>
-          Tin Tức & Blog
-        </h2>
-        <Row>
-          {[
-            {
-              id: 1,
-              title: "Top 5 cuốn sách nên đọc năm 2024",
-              image: "/image/Tong-quan-20.jpg",
-              desc: "Danh sách những cuốn sách hay, dành cho mọi lứa tuổi, giúp bạn phát triển bản thân.",
-            },
-            {
-              id: 2,
-              title: "Những chủ đề sách hot đang được yêu thích",
-              image: "/image/ket-qua-chung-ket-the-gioi-2_b474288dc1154ec0834cc89aa1f966eb_1024x1024.jpg",
-              desc: "Khám phá các chủ đề và thể loại sách đang được các bạn trẻ bình chọn nhiều.",
-            },
-            {
-              id: 3,
-              title: "Khuyến khích sinh viên đọc sách mỗi ngày",
-              image: "/image/1735121535_Yasuonhba.png",
-              desc: "Khuyến khích sinh viên đọc sách mỗi ngày để nâng cao kiến thức, phát triển kỹ năng.",
-            },
-          ].map((news) => (
-            <Col key={news.id} xs={12} md={4} className="mb-4 d-flex">
-              <Card className="h-100 shadow rounded-4 border-0 flex-fill" style={{
-                background: "linear-gradient(120deg, #fffbe8 75%, #fff1c1 100%)"
-              }}>
-                <Card.Img
-                  variant="top"
-                  src={news.image}
-                  alt={news.title}
+          letterSpacing: ".03em",
+        }}
+      >
+        Tin Tức & Blog
+      </h2>
+
+      <Row>
+        {[
+          {
+            id: 1,
+            title: "Top 5 cuốn sách nên đọc năm 2024",
+            image: "/image/kheo-an-noi-mck5-996.jpg",
+            desc: "Danh sách những cuốn sách hay, dành cho mọi lứa tuổi, giúp bạn phát triển bản thân.",
+            link: "https://vietnamnet.vn/10-cuon-sach-best-seller-nen-doc-nam-2024-2253321.html",
+          },
+          {
+            id: 2,
+            title: "Những chủ đề sách hot đang được yêu thích",
+            image:
+              "/image/ket-qua-chung-ket-the-gioi-2_b474288dc1154ec0834cc89aa1f966eb_1024x1024.jpg",
+            desc: "Khám phá các chủ đề và thể loại sách đang được các bạn trẻ bình chọn nhiều.",
+            link: "https://www.t1.gg/",
+          },
+          {
+            id: 3,
+            title: "Khuyến khích sinh viên đọc sách mỗi ngày",
+            image: "/image/images.jpeg",
+            desc: "Khuyến khích sinh viên đọc sách mỗi ngày để nâng cao kiến thức, phát triển kỹ năng.",
+            link: "https://zalopay.vn/nhung-cuon-sach-hay-cho-hoc-sinh-sinh-vien-1557",
+          },
+        ].map((news) => (
+          <Col key={news.id} xs={12} md={4} className="mb-4 d-flex">
+            <Card
+              className="h-100 shadow rounded-4 border-0 flex-fill"
+              style={{
+                background: "linear-gradient(120deg, #fffbe8 75%, #fff1c1 100%)",
+              }}
+            >
+              <Card.Img
+                variant="top"
+                src={news.image}
+                alt={news.title}
+                style={{
+                  height: "210px",
+                  objectFit: "cover",
+                  borderTopLeftRadius: "1.5rem",
+                  borderTopRightRadius: "1.5rem",
+                }}
+              />
+              <Card.Body className="d-flex flex-column">
+                <Card.Title
+                  className="text-secondary-emphasis fw-bold"
+                  style={{ fontSize: "1.05rem" }}
+                >
+                  {news.title}
+                </Card.Title>
+                <Card.Text style={{ flex: 1 }}>{news.desc}</Card.Text>
+
+                {/* Nút "Đọc tiếp" có link riêng */}
+                <a
+                  href={news.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline-warning fw-bold"
                   style={{
-                    height: "210px",
-                    objectFit: "cover",
-                    borderTopLeftRadius: "1.5rem",
-                    borderTopRightRadius: "1.5rem"
+                    borderRadius: "1.2rem",
+                    width: "120px",
+                    marginTop: "auto",
+                    textAlign: "center",
                   }}
-                />
-                <Card.Body className="d-flex flex-column">
-                  <Card.Title className="text-secondary-emphasis fw-bold" style={{ fontSize: "1.05rem" }}>
-                    {news.title}
-                  </Card.Title>
-                  <Card.Text style={{ flex: 1 }}>{news.desc}</Card.Text>
-                  <Button
-                    variant="outline-warning"
-                    className="ms-0"
-                    style={{
-                      borderRadius: "1.2rem",
-                      width: "120px",
-                      fontWeight: 700,
-                      marginTop: "auto"
-                    }}
-                  >
-                    Đọc tiếp →
-                  </Button>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      </Container>
+                >
+                  Đọc tiếp →
+                </a>
+              </Card.Body>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+    </Container>
     </>
   );
 }

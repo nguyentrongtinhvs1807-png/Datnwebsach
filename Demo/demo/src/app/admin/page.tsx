@@ -24,7 +24,9 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 function UserManager() {
   const [users, setUsers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [showHidden, setShowHidden] = useState(false);
 
+  // 🔹 Lấy danh sách người dùng từ server
   useEffect(() => {
     fetch("http://localhost:3003/users")
       .then((res) => res.json())
@@ -32,66 +34,170 @@ function UserManager() {
       .catch(() => setUsers([]));
   }, []);
 
-  const deleteUser = async (id: number) => {
-    if (!confirm("Bạn có chắc muốn xoá người dùng này?")) return;
-    await fetch(`http://localhost:3003/users/${id}`, { method: "DELETE" });
-    setUsers((prev) => prev.filter((u) => u.nguoi_dung_id !== id));
+  // 🔹 Ẩn người dùng (PATCH)
+  const hideUser = async (id: number) => {
+    if (!confirm("👻 Bạn có chắc muốn ẨN người dùng này (không xoá dữ liệu)?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:3003/users/${id}/hide`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(" " + data.message);
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.nguoi_dung_id === id ? { ...u, is_hidden: 1 } : u
+          )
+        );
+      } else {
+        alert("❌ " + (data.error || "Lỗi khi ẩn người dùng"));
+      }
+    } catch (err) {
+      console.error("Lỗi khi gọi API hide:", err);
+      alert("Không thể kết nối đến server!");
+    }
   };
 
-  const filtered = users.filter((u) => {
-    const ten = (u?.ten || u?.ho_ten || "").toString().toLowerCase();
-    const email = (u?.email || "").toString().toLowerCase();
-    const keyword = search.toLowerCase();
-    return ten.includes(keyword) || email.includes(keyword);
-  });
+  // 🔹 Hiện lại người dùng (PATCH)
+  const unhideUser = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:3003/users/${id}/unhide`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("👁️ " + data.message);
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.nguoi_dung_id === id ? { ...u, is_hidden: 0 } : u
+          )
+        );
+      } else {
+        alert("❌ " + (data.error || "Lỗi khi hiện lại người dùng"));
+      }
+    } catch (err) {
+      console.error("Lỗi khi gọi API unhide:", err);
+      alert("Không thể kết nối đến server!");
+    }
+  };
+
+  // 🔹 Lọc danh sách theo từ khoá và trạng thái
+  const filtered = users
+    .filter((u) => (showHidden ? true : u.is_hidden !== 1))
+    .filter((u) => {
+      const keyword = search.toLowerCase();
+      const ten = (u.ho_ten || u.ten || "").toLowerCase();
+      const email = (u.email || "").toLowerCase();
+      return ten.includes(keyword) || email.includes(keyword);
+    });
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-4 d-flex gap-2">
         <input
           type="text"
           className="form-control"
           placeholder="Tìm kiếm theo tên hoặc email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px" }}
+          style={{
+            borderRadius: "10px",
+            border: "2px solid #e0e0e0",
+            padding: "10px",
+          }}
         />
+        <button
+          className="btn btn-outline-secondary"
+          onClick={() => setShowHidden((p) => !p)}
+        >
+          {showHidden ? "Ẩn người bị ẩn" : "Hiện người bị ẩn"}
+        </button>
       </div>
+
       {filtered.length === 0 ? (
         <div className="text-center py-5">
-          <p className="text-muted fs-5">Không có người dùng nào.</p>
+          <p className="text-muted fs-5">Không có người dùng nào hiển thị.</p>
         </div>
       ) : (
         <div className="table-responsive shadow-sm rounded-3 overflow-hidden">
           <table className="table table-hover align-middle mb-0">
-            <thead style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}>
+            <thead
+              style={{
+                background:
+                  "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)",
+                color: "white",
+              }}
+            >
               <tr>
                 <th style={{ fontWeight: 600 }}>ID</th>
                 <th style={{ fontWeight: 600 }}>Tên</th>
                 <th style={{ fontWeight: 600 }}>Email</th>
                 <th style={{ fontWeight: 600 }}>Vai trò</th>
+                <th style={{ fontWeight: 600 }}>Trạng thái</th>
                 <th style={{ fontWeight: 600 }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((u) => (
-                <tr key={u.nguoi_dung_id} style={{ transition: "background 0.2s" }}>
+                <tr
+                  key={u.nguoi_dung_id}
+                  style={{
+                    opacity: u.is_hidden === 1 ? 0.5 : 1,
+                    transition: "opacity 0.3s",
+                  }}
+                >
                   <td className="fw-semibold">{u.nguoi_dung_id}</td>
                   <td>{u.ten || u.ho_ten}</td>
                   <td>{u.email}</td>
                   <td>
-                    <span className={`badge ${u.role === "admin" ? "bg-danger" : "bg-primary"}`} style={{ padding: "6px 12px", borderRadius: "8px" }}>
-                      {u.role === "admin" ? "Quản trị viên" : "Người dùng"}
+                    <span
+                      className={`badge ${
+                        u.role === "admin" ? "bg-danger" : "bg-primary"
+                      }`}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "8px",
+                      }}
+                    >
+                      {u.role === "admin"
+                        ? "Quản trị viên"
+                        : "Người dùng"}
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => deleteUser(u.nguoi_dung_id)}
-                      style={{ borderRadius: "8px", fontWeight: 500 }}
-                    >
-                      Ẩn Người Dùng
-                    </button>
+                    {u.is_hidden === 1 ? (
+                      <span className="badge bg-secondary">Đã ẩn</span>
+                    ) : (
+                      <span className="badge bg-success">Hiển thị</span>
+                    )}
+                  </td>
+                  <td>
+                    {u.is_hidden === 1 ? (
+                      <button
+                        className="btn btn-sm btn-outline-success"
+                        onClick={() => unhideUser(u.nguoi_dung_id)}
+                        style={{
+                          borderRadius: "8px",
+                          fontWeight: 500,
+                        }}
+                      >
+                         Hiện lại
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => hideUser(u.nguoi_dung_id)}
+                        style={{
+                          borderRadius: "8px",
+                          fontWeight: 500,
+                        }}
+                      >
+                        👻 Ẩn Người Dùng
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -102,6 +208,7 @@ function UserManager() {
     </div>
   );
 }
+
 
 // ========== QUẢN LÝ BÌNH LUẬN ==========
 function CommentManager() {
@@ -365,7 +472,7 @@ export default function AdminPage() {
           {activeTab === "danhmuc" && (
             <>
               <h4 className="fw-bold text-primary mb-3">Quản lý Danh Mục</h4>
-              <AdminDanhMucPage /> {/* ✅ Gọi đúng trang danh mục */}
+              <AdminDanhMucPage /> {/* Gọi đúng trang danh mục */}
             </>
           )}
         </div>

@@ -33,7 +33,7 @@ db.connect((err) => {
   if (err) {
     console.error("❌ Kết nối MySQL thất bại:", err);
   } else {
-    console.log("✅ Đã kết nối MySQL thành công!");
+    console.log(" Đã kết nối MySQL thành công!");
   }
 });
 
@@ -101,7 +101,7 @@ app.post("/api/ma-giam-gia", (req, res) => {
         console.error("❌ Lỗi thêm mã giảm giá:", err);
         return res.status(500).json({ message: "Lỗi khi thêm mã giảm giá" });
       }
-      res.json({ message: "✅ Thêm mã giảm giá thành công!" });
+      res.json({ message: " Thêm mã giảm giá thành công!" });
     }
   );
 });
@@ -114,7 +114,7 @@ app.delete("/api/ma-giam-gia/:id", (req, res) => {
       console.error("❌ Lỗi xoá mã giảm giá:", err);
       return res.status(500).json({ message: "Không thể xoá mã giảm giá" });
     }
-    res.json({ message: "✅ Đã xoá mã giảm giá" });
+    res.json({ message: " Đã xoá mã giảm giá" });
   });
 });
 
@@ -139,7 +139,7 @@ app.get("/voucher", (req, res) => {
   });
 });
 
-// ✅ API endpoint mới cho checkout - format phù hợp với frontend
+//  API endpoint mới cho checkout - format phù hợp với frontend
 app.get("/discount-codes/:code", (req, res) => {
   const code = req.params.code;
 
@@ -347,8 +347,8 @@ app.post("/comments", (req, res) => {
 });
 // ================== AUTH ==================
 
-// 🧾 Đăng ký tài khoản
-app.post("/auth/register", async (req, res) => {
+//  Đăng ký tài khoản (phiên bản DEV - không mã hóa mật khẩu)
+app.post("/auth/register", (req, res) => {
   const { ho_ten, email, mat_khau } = req.body;
 
   if (!ho_ten || !email || !mat_khau) {
@@ -356,9 +356,9 @@ app.post("/auth/register", async (req, res) => {
   }
 
   const checkEmailSQL = "SELECT nguoi_dung_id FROM nguoi_dung WHERE email = ? LIMIT 1";
-  db.query(checkEmailSQL, [email], async (err, results) => {
+  db.query(checkEmailSQL, [email], (err, results) => {
     if (err) {
-      console.error("Lỗi truy vấn email:", err);
+      console.error("❌ Lỗi truy vấn email:", err);
       return res.status(500).json({ message: "❌ Lỗi máy chủ khi kiểm tra email" });
     }
 
@@ -366,31 +366,29 @@ app.post("/auth/register", async (req, res) => {
       return res.status(400).json({ message: "❌ Email đã tồn tại" });
     }
 
-    try {
-      const hashedPassword = await bcrypt.hash(mat_khau, 10);
-      const insertSQL = `
-        INSERT INTO nguoi_dung (Ten, email, mat_khau, role)
-        VALUES (?, ?, ?, 'user')
-      `;
-      db.query(insertSQL, [ho_ten, email, hashedPassword], (err2, result) => {
-        if (err2) {
-          console.error("Lỗi khi thêm người dùng:", err2);
-          return res.status(500).json({ message: "❌ Lỗi khi tạo tài khoản" });
-        }
+    // 👉 Lưu mật khẩu thường, không mã hóa
+    const insertSQL = `
+      INSERT INTO nguoi_dung (Ten, email, mat_khau, role)
+      VALUES (?, ?, ?, 'user')
+    `;
+    db.query(insertSQL, [ho_ten, email, mat_khau], (err2, result) => {
+      if (err2) {
+        console.error("❌ Lỗi khi thêm người dùng:", err2);
+        return res.status(500).json({ message: "❌ Lỗi khi tạo tài khoản" });
+      }
 
-        res.json({
-          message: "✅ Đăng ký thành công",
-          userId: result.insertId,
-        });
+      res.json({
+        message: " Đăng ký thành công (mật khẩu lưu dạng thường)",
+        userId: result.insertId,
       });
-    } catch (hashErr) {
-      console.error("Lỗi mã hoá mật khẩu:", hashErr);
-      res.status(500).json({ message: "❌ Lỗi xử lý mật khẩu" });
-    }
+    });
   });
 });
 
-// 🔐 Đăng nhập tài khoản (phiên bản DEV - không mã hóa)
+
+
+
+//  Đăng nhập tài khoản (phiên bản DEV - không mã hóa)
 app.post("/auth/login", (req, res) => {
   const { email, mat_khau } = req.body;
 
@@ -411,21 +409,23 @@ app.post("/auth/login", (req, res) => {
 
     const user = results[0];
 
-    // ✅ So sánh trực tiếp mật khẩu (chưa mã hóa)
-    if (mat_khau !== user.mat_khau) {
+    // So sánh mật khẩu (ép về string)
+    const inputPass = String(mat_khau).trim();
+    const storedPass = String(user.mat_khau).trim();
+
+    if (inputPass !== storedPass) {
       return res.status(401).json({ message: "❌ Sai mật khẩu" });
     }
 
-    // ✅ Tạo JWT token
+    // Tạo JWT token
     const token = jwt.sign(
       { id: user.nguoi_dung_id, role: user.role, email: user.email },
       JWT_SECRET,
       { expiresIn: "2h" }
     );
 
-    // ✅ Trả kết quả về client
     res.json({
-      message: "✅ Đăng nhập thành công",
+      message: " Đăng nhập thành công",
       user: {
         id: user.nguoi_dung_id,
         ten: user.Ten,
@@ -437,7 +437,10 @@ app.post("/auth/login", (req, res) => {
   });
 });
 
-// 🔑 Đổi mật khẩu (YÊU CẦU TOKEN)
+
+
+
+//  Đổi mật khẩu (YÊU CẦU TOKEN)
 app.post("/auth/doi-pass", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -472,7 +475,7 @@ app.post("/auth/doi-pass", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Lấy tất cả loại sách
+//  Lấy tất cả loại sách
 app.get("/categories", (req, res) => {
   const sql = "SELECT * FROM loai_sach";
   db.query(sql, (err, results) => {
@@ -481,7 +484,7 @@ app.get("/categories", (req, res) => {
   });
 });
 
-// ✅ Lấy sách theo loại
+//  Lấy sách theo loại
 app.get("/books/category/:id", (req, res) => {
   const { id } = req.params;
   const sql = `
@@ -500,7 +503,7 @@ app.get("/books/category/:id", (req, res) => {
   });
 });
 
-// 📘 Lấy tất cả bình luận kèm tên user + sản phẩm
+//  Lấy tất cả bình luận kèm tên user + sản phẩm
 app.get("/comments", (req, res) => {
   const sql = `
     SELECT b.*, 
@@ -520,7 +523,7 @@ app.get("/comments", (req, res) => {
   });
 });
 
-// 🗑️ Xoá bình luận
+//  Xoá bình luận
 app.delete("/comments/:id", (req, res) => {
   const id = req.params.id;
   const sql = "DELETE FROM binh_luan WHERE binh_luan_id = ?";
@@ -529,11 +532,11 @@ app.delete("/comments/:id", (req, res) => {
       console.error("❌ Lỗi xoá bình luận:", err);
       return res.status(500).json({ message: "Lỗi khi xoá bình luận" });
     }
-    res.json({ message: "✅ Đã xoá bình luận" });
+    res.json({ message: " Đã xoá bình luận" });
   });
 });
 
-// ✅ API: Lấy toàn bộ danh sách sản phẩm
+//  API: Lấy toàn bộ danh sách sản phẩm
 app.get("/products", (req, res) => {
   const sql = "SELECT * FROM sach"; 
 
@@ -546,7 +549,7 @@ app.get("/products", (req, res) => {
   });
 });
 
-// ✅ API: Lấy danh sách sách (bao gồm cả sách đã ẩn cho admin)
+//  API: Lấy danh sách sách (bao gồm cả sách đã ẩn cho admin)
 app.get("/sach", (req, res) => {
   // Đảm bảo cột an_hien tồn tại và set mặc định = 1 cho tất cả sách
   db.query("ALTER TABLE sach ADD COLUMN IF NOT EXISTS an_hien INT DEFAULT 1", (errAlter) => {
@@ -568,7 +571,7 @@ app.get("/sach", (req, res) => {
       console.error("❌ Lỗi truy vấn:", err);
       return res.status(500).json({ message: "Lỗi khi lấy danh sách sách" });
     }
-    console.log("✅ Dữ liệu sách:", results);
+    console.log(" Dữ liệu sách:", results);
     res.json(results);
   });
 });
@@ -587,12 +590,12 @@ app.put("/sachs/:id", (req, res) => {
       console.error("❌ Lỗi update:", err);
       return res.status(500).json({ message: "Cập nhật thất bại!" });
     }
-    res.json({ message: "✅ Cập nhật thành công!", result });
+    res.json({ message: " Cập nhật thành công!", result });
   });
 });
 
 
-// ✅ API: Ẩn sách theo ID (không xóa khỏi database)
+//  API: Ẩn sách theo ID (không xóa khỏi database)
 app.delete("/sach/:id", (req, res) => {
   const { id } = req.params;
   // Đảm bảo cột an_hien tồn tại
@@ -603,12 +606,12 @@ app.delete("/sach/:id", (req, res) => {
         console.error("❌ Lỗi khi ẩn sách:", err.sqlMessage);
         return res.status(500).json({ message: "Lỗi khi ẩn sách", error: err.sqlMessage });
       }
-      res.json({ message: "✅ Đã ẩn sách thành công!" });
+      res.json({ message: " Đã ẩn sách thành công!" });
     });
   });
 });
 
-// ✅ API: Khôi phục sách đã ẩn
+//  API: Khôi phục sách đã ẩn
 app.put("/sach/:id/restore", (req, res) => {
   const { id } = req.params;
   const sql = `UPDATE sach SET an_hien = 1 WHERE sach_id = ?`;
@@ -617,13 +620,15 @@ app.put("/sach/:id/restore", (req, res) => {
       console.error("❌ Lỗi khi khôi phục sách:", err.sqlMessage);
       return res.status(500).json({ message: "Lỗi khi khôi phục sách", error: err.sqlMessage });
     }
-    res.json({ message: "✅ Đã khôi phục sách thành công!" });
+    res.json({ message: " Đã khôi phục sách thành công!" });
   });
 });
 
-// 🔹 Lấy danh sách người dùng
+
+
+//  Lấy danh sách người dùng (chỉ người chưa ẩn)
 app.get("/users", (req, res) => {
-  const sql = "SELECT * FROM nguoi_dung";
+  const sql = "SELECT * FROM nguoi_dung WHERE is_hidden = 0";
   db.query(sql, (err, results) => {
     if (err) {
       console.error("Lỗi truy vấn:", err);
@@ -633,17 +638,54 @@ app.get("/users", (req, res) => {
   });
 });
 
-// 🔹 Xóa người dùng
+//  Lấy tất cả (bao gồm người bị ẩn)
+app.get("/users/all", (req, res) => {
+  const sql = "SELECT * FROM nguoi_dung";
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ error: "Lỗi truy vấn CSDL" });
+    res.json(results);
+  });
+});
+
+//  Ẩn người dùng (Cập nhật is_hidden = 1)
+app.patch("/users/:id/hide", (req, res) => {
+  const id = req.params.id;
+  const sql = "UPDATE nguoi_dung SET is_hidden = 1 WHERE nguoi_dung_id = ?";
+  db.query(sql, [id], (err) => {
+    if (err) {
+      console.error("❌ Lỗi khi ẩn người dùng:", err);
+      return res.status(500).json({ error: "Không thể ẩn người dùng" });
+    }
+    res.json({ message: "👻 Người dùng đã được ẩn (không xóa dữ liệu)!" });
+  });
+});
+
+//  Hiện lại người dùng (Cập nhật is_hidden = 0)
+app.patch("/users/:id/unhide", (req, res) => {
+  const id = req.params.id;
+  const sql = "UPDATE nguoi_dung SET is_hidden = 0 WHERE nguoi_dung_id = ?";
+  db.query(sql, [id], (err) => {
+    if (err) {
+      console.error("❌ Lỗi khi hiện người dùng:", err);
+      return res.status(500).json({ error: "Không thể hiện người dùng" });
+    }
+    res.json({ message: " Người dùng đã được hiện lại!" });
+  });
+});
+
+// ⚠️ Xoá thật (không khuyến khích)
 app.delete("/users/:id", (req, res) => {
   const id = req.params.id;
   const sql = "DELETE FROM nguoi_dung WHERE nguoi_dung_id = ?";
   db.query(sql, [id], (err) => {
     if (err) return res.status(500).json({ error: "Lỗi khi xóa" });
-    res.json({ message: "Xóa thành công" });
+    res.json({ message: "Đã xoá vĩnh viễn người dùng!" });
   });
 });
 
-// ✅ API: Lấy danh sách đơn hàng + tổng tiền
+
+
+//  API: Lấy danh sách đơn hàng + tổng tiền
 app.get("/orders", (req, res) => {
   const sql = `
     SELECT 
@@ -700,8 +742,7 @@ app.post("/orders", (req, res) => {
       : payment === "e-wallet"
       ? 3
       : null;
-  const trang_thai = "Chờ xác nhận"; // ✅ thêm trạng thái mặc định
-
+  const trang_thai = "Chờ xác nhận"; 
   const sqlOrder = `
     INSERT INTO don_hang (nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, ngay_dat, DC_GH, trang_thai)
     VALUES (?, ?, ?, NOW(), ?, ?)
@@ -717,7 +758,7 @@ app.post("/orders", (req, res) => {
       }
 
       const don_hang_id = result.insertId;
-      console.log("✅ Đã tạo đơn hàng ID:", don_hang_id);
+      console.log(" Đã tạo đơn hàng ID:", don_hang_id);
 
       const sqlDetail = `
         INSERT INTO don_hang_ct (don_hang_id, sach_id, So_luong, gia)
@@ -738,13 +779,13 @@ app.post("/orders", (req, res) => {
             .json({ error: "Không thể lưu chi tiết đơn hàng" });
         }
 
-        console.log("✅ Đã lưu chi tiết đơn hàng cho ID:", don_hang_id);
+        console.log(" Đã lưu chi tiết đơn hàng cho ID:", don_hang_id);
         res.status(201).json({
           message: "🎉 Đặt hàng thành công!",
           orderId: don_hang_id,
           total: totalPrice,
           userId: nguoi_dung_id,
-          status: trang_thai, // ✅ trả trạng thái về frontend
+          status: trang_thai, 
         });
       });
     }
@@ -752,7 +793,7 @@ app.post("/orders", (req, res) => {
 });
 
 
-// ✅ API: LẤY CHI TIẾT ĐƠN HÀNG (CÓ HÌNH ẢNH SẢN PHẨM)
+//  API: LẤY CHI TIẾT ĐƠN HÀNG (CÓ HÌNH ẢNH SẢN PHẨM)
 app.get("/orders/:id/details", (req, res) => {
   const { id } = req.params;
 
@@ -830,7 +871,7 @@ app.put("/orders/:id/status", (req, res) => {
 });
 
 
-// 🟢 Lấy tất cả voucher
+//  Lấy tất cả voucher
 app.get("/api/voucher", (req, res) => {
   const sql = "SELECT * FROM ma_giam_gia ORDER BY giam_gia_id DESC";
   db.query(sql, (err, results) => {
@@ -854,7 +895,7 @@ app.get("/api/voucher", (req, res) => {
   });
 });
 
-// 🟡 Thêm voucher mới
+// Thêm voucher mới
 app.post("/api/voucher", (req, res) => {
   const { code, discount, min_order, max_discount, start_date, end_date, description } = req.body;
 
@@ -876,12 +917,12 @@ app.post("/api/voucher", (req, res) => {
         console.error("❌ Lỗi khi thêm voucher:", err);
         return res.status(500).json({ error: "Không thể thêm voucher" });
       }
-      res.json({ message: "✅ Thêm voucher thành công", id: result.insertId });
+      res.json({ message: " Thêm voucher thành công", id: result.insertId });
     }
   );
 });
 
-// 🔵 Cập nhật voucher
+// Cập nhật voucher
 app.put("/api/voucher", (req, res) => {
   const { id, code, discount, min_order, max_discount, start_date, end_date, description } = req.body;
 
@@ -901,12 +942,12 @@ app.put("/api/voucher", (req, res) => {
         console.error("❌ Lỗi khi cập nhật voucher:", err);
         return res.status(500).json({ error: "Không thể cập nhật voucher" });
       }
-      res.json({ message: "✅ Cập nhật voucher thành công" });
+      res.json({ message: " Cập nhật voucher thành công" });
     }
   );
 });
 
-// 🔴 Xoá voucher
+//  Xoá voucher
 app.delete("/api/voucher", (req, res) => {
   const id = req.query.id;
   if (!id) return res.status(400).json({ error: "Thiếu ID voucher cần xóa" });
@@ -921,7 +962,7 @@ app.delete("/api/voucher", (req, res) => {
   });
 });
 
-// 📸 API lấy hình ảnh theo sách_id
+// API lấy hình ảnh theo sách_id
 app.get("/books/:id/images", (req, res) => {
   const { id } = req.params;
   const sql = "SELECT * FROM hinh WHERE sach_id = ?";
@@ -971,7 +1012,7 @@ app.post("/api/qr", async (req, res) => {
 
 // ================== LOẠI SÁCH ==================
 
-// 🟢 Lấy tất cả loại sách
+//  Lấy tất cả loại sách
 app.get("/loaisach", (req, res) => {
   db.query("SELECT * FROM Loai_sach ORDER BY loai_sach_id DESC", (err, results) => {
     if (err) {
@@ -982,7 +1023,7 @@ app.get("/loaisach", (req, res) => {
   });
 });
 
-// 🟡 Thêm loại sách
+//  Thêm loại sách
 app.post("/loaisach", (req, res) => {
   const { ten_loai } = req.body;
   if (!ten_loai) return res.status(400).json({ error: "Thiếu tên loại" });
@@ -995,7 +1036,7 @@ app.post("/loaisach", (req, res) => {
         console.error("❌ Lỗi thêm Loai_sach:", err);
         return res.status(500).json({ error: "Không thể thêm loại sách" });
       }
-      res.json({ message: "✅ Thêm loại sách thành công", id: result.insertId });
+      res.json({ message: " Thêm loại sách thành công", id: result.insertId });
     }
   );
 });
@@ -1013,12 +1054,12 @@ app.put("/loaisach/:id", (req, res) => {
         console.error("❌ Lỗi cập nhật Loai_sach:", err);
         return res.status(500).json({ error: "Không thể cập nhật loại sách" });
       }
-      res.json({ message: "✅ Cập nhật loại sách thành công" });
+      res.json({ message: " Cập nhật loại sách thành công" });
     }
   );
 });
 
-// 🔴 Xóa loại sách
+// Xóa loại sách
 app.delete("/loaisach/:id", (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM Loai_sach WHERE loai_sach_id = ?", [id], (err) => {
@@ -1030,7 +1071,7 @@ app.delete("/loaisach/:id", (req, res) => {
   });
 });
 
-// 📘 Lấy danh sách sách theo loại (JOIN với bảng hinh)
+//  Lấy danh sách sách theo loại (JOIN với bảng hinh)
 app.get("/loaisach/:id/sach", (req, res) => {
   const { id } = req.params;
   const sql = `

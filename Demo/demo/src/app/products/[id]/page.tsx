@@ -543,7 +543,7 @@ export default function BookDetail() {
               </div>
               {/* Flash Sale */}
               <div className="noti-flash-sale mb-3 text-center">
-                <span style={{ marginRight: 10 }}>🔥 FLASH SALE</span>
+                <span style={{ marginRight: 10 }}> FLASH SALE</span>
                 <span style={{
                   color: "#fd6b64",
                   fontWeight: 700,

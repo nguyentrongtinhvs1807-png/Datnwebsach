@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import {
@@ -22,11 +23,11 @@ type Stats = {
   revenue: RevenueItem[];
 };
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
-    //  Dữ liệu giả lập
+    // ✅ Dữ liệu giả lập API
     setTimeout(() => {
       setStats({
         products: 53,
@@ -40,10 +41,10 @@ export default function Dashboard() {
           { month: "Tháng 5/2025", total: 6900000 },
         ],
       });
-    }, 1000); // mô phỏng load API 1 giây
+    }, 1000);
   }, []);
 
-  if (!stats) return <p> Đang tải dữ liệu thống kê...</p>;
+  if (!stats) return <p className="p-6">Đang tải dữ liệu thống kê...</p>;
 
   const chartData = {
     labels: stats.revenue.map((r) => r.month),
@@ -60,7 +61,7 @@ export default function Dashboard() {
     responsive: true,
     plugins: {
       legend: { position: "top" as const },
-      title: { display: true, text: " Doanh thu theo tháng" },
+      title: { display: true, text: "Doanh thu theo tháng" },
     },
   };
 
@@ -68,23 +69,25 @@ export default function Dashboard() {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">📊 Bảng thống kê</h1>
 
-      {/* Các ô thống kê */}
-      <div className="grid grid-cols-3 gap-6 mb-6">
+      {/* ✅ 3 BOX thống kê */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
         <div className="bg-blue-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold"> Sản phẩm</h2>
+          <h2 className="text-lg font-semibold">Sản phẩm</h2>
           <p className="text-3xl font-bold">{stats.products}</p>
         </div>
+
         <div className="bg-green-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold"> Đơn hàng</h2>
+          <h2 className="text-lg font-semibold">Đơn hàng</h2>
           <p className="text-3xl font-bold">{stats.orders}</p>
         </div>
+
         <div className="bg-yellow-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold"> Người dùng</h2>
+          <h2 className="text-lg font-semibold">Người dùng</h2>
           <p className="text-3xl font-bold">{stats.users}</p>
         </div>
       </div>
 
-      {/* Biểu đồ doanh thu */}
+      {/* ✅ Biểu đồ */}
       <div className="bg-white shadow p-6 rounded-2xl">
         <Bar data={chartData} options={options} />
       </div>

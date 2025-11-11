@@ -34,6 +34,14 @@ export default function Home() {
         >
           🧑‍💻 Đăng ký
         </Link>
+
+        {/* Thêm nút quay lại trang Home */}
+        <Link
+          href="/home"
+          className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-xl transition duration-200"
+        >
+          🏠 Quay về trang Home
+        </Link>
       </div>
 
       <footer className="mt-16 text-sm text-gray-600">
