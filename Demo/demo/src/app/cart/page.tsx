@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { FaMinus, FaPlus, FaTrashAlt } from "react-icons/fa";
 
@@ -12,15 +12,12 @@ type Product = {
   quantity: number;
 };
 
-// ✅ danh sách mã giảm giá
-const discountCodes: Record<
-  string,
-  { type: "percent" | "minus"; value: number }
-> = {
-  SALE10: { type: "percent", value: 10 },
-  SALE20: { type: "percent", value: 20 },
-  GIAM50K: { type: "minus", value: 50000 },
-  FREESHIP: { type: "minus", value: 20000 },
+// Định nghĩa kiểu dữ liệu cho mã giảm giá đã áp dụng (đồng nhất với CheckoutPage)
+type Discount = {
+  code: string;
+  value: number; // Giá trị: phần trăm (10) hoặc tiền cố định (50000)
+  type: "percent" | "fixed";
+  maxDiscount?: number; // Tối đa (chỉ áp dụng cho percent)
 };
 
 export default function CartPage() {
@@ -28,28 +25,65 @@ export default function CartPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [mounted, setMounted] = useState(false);
 
-  // ✅ discount states
+  // Discount States
   const [discountCode, setDiscountCode] = useState("");
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const [appliedDiscount, setAppliedDiscount] = useState<Discount | null>(null);
   const [discountError, setDiscountError] = useState("");
+  const [isApplying, setIsApplying] = useState(false); // Trạng thái loading
 
+  // Load cart và mã giảm giá
   useEffect(() => {
     setMounted(true);
 
     const stored = JSON.parse(localStorage.getItem("cart") || "[]");
 
-    const normalized = stored.map((item: any, index: number) => ({
-      id: item.id?.toString() || item.sach_id?.toString() || `book_${index}`,
-      name: item.name || item.ten_sach || "Sách chưa có tên",
-      price: Number(item.price || item.gia_sach || 0),
-      image: item.image || "/no-image.png",
+    // Lọc item lỗi
+    const cleaned = stored.filter(
+      (item: any) =>
+        item &&
+        typeof item === "object" &&
+        (item.id !== undefined || item.sach_id !== undefined)
+    );
+    
+
+    // Chuẩn hóa: Ưu tiên dùng item.id, sau đó đến item.sach_id
+    const normalized = cleaned.map((item: any) => ({
+      id: String(item.id || item.sach_id), 
+      name: item.name || item.ten_sach || "Sản phẩm không tên",
+      price: Number(item.price) || 0,
+      image: item.image || "/image/default-book.jpg",
       quantity: Number(item.quantity || 1),
     }));
+    
+
+    // Lưu lại localStorage nếu có item rác
+    if (cleaned.length !== stored.length) {
+      localStorage.setItem("cart", JSON.stringify(normalized));
+    }
 
     setCart(normalized);
-    setSelectedIds([]);
-  }, []);
+    setSelectedIds(normalized.map((item: Product) => item.id)); // 💡 Mặc định chọn tất cả
+    
 
+    // 🌟 TẢI MÃ GIẢM GIÁ ĐÃ LƯU TỪ LOCAL STORAGE
+    const rawDiscount = localStorage.getItem("appliedDiscount");
+    if (rawDiscount) {
+        try {
+            const loadedDiscount: Discount = JSON.parse(rawDiscount);
+            setAppliedDiscount(loadedDiscount);
+            setDiscountCode(loadedDiscount.code);
+            setDiscountError(`Mã ${loadedDiscount.code} đã được áp dụng!`);
+        } catch (e) {
+            console.error("Lỗi khi tải mã giảm giá từ Local Storage:", e);
+            localStorage.removeItem("appliedDiscount");
+        }
+    }
+    
+    // Xóa thông tin "Mua ngay"
+    localStorage.removeItem("checkoutItem");
+  }, []); // Chỉ chạy 1 lần khi mount
+
+  // Update quantity
   const updateQuantity = (id: string, delta: number) => {
     const updated = cart.map((item) =>
       item.id === id
@@ -60,14 +94,19 @@ export default function CartPage() {
     localStorage.setItem("cart", JSON.stringify(updated));
   };
 
+  // Remove product
   const removeFromCart = (id: string) => {
+    // Thay thế alert/confirm bằng modal tùy chỉnh trong môi trường thực tế
     if (!window.confirm("Bạn có chắc muốn xóa sản phẩm này không?")) return;
+
     const updated = cart.filter((item) => item.id !== id);
     setCart(updated);
     localStorage.setItem("cart", JSON.stringify(updated));
+
     setSelectedIds((prev) => prev.filter((sid) => sid !== id));
   };
 
+  // Select toggle
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
@@ -75,8 +114,11 @@ export default function CartPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.length === cart.length) setSelectedIds([]);
-    else setSelectedIds(cart.map((item) => item.id));
+    if (selectedIds.length === cart.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(cart.map((item) => item.id));
+    }
   };
 
   const formatPrice = (price: number) =>
@@ -91,37 +133,130 @@ export default function CartPage() {
     0
   );
 
-  // ✅ APPLY DISCOUNT
-  const applyDiscount = () => {
+  // ------------------------------------------------------------------
+  // LOGIC MÃ GIẢM GIÁ (ĐÃ THÊM LOGIC LƯU VÀO LOCAL STORAGE)
+  // ------------------------------------------------------------------
+  const applyDiscount = async () => {
     setDiscountError("");
-    setDiscountAmount(0);
+    setAppliedDiscount(null);
+    if (isApplying) return;
+    setIsApplying(true);
 
     const code = discountCode.trim().toUpperCase();
 
     if (!code) {
       setDiscountError("Vui lòng nhập mã giảm giá!");
+      setIsApplying(false);
       return;
     }
-
-    const discount = discountCodes[code];
-
-    if (!discount) {
-      setDiscountError("Mã giảm giá không hợp lệ!");
-      return;
+    
+    // 💡 Thêm check: Nếu chưa chọn sản phẩm nào, không áp dụng mã
+    if (selectedIds.length === 0 || totalSelected === 0) {
+        setDiscountError("Vui lòng chọn ít nhất một sản phẩm để áp dụng mã!");
+        setIsApplying(false);
+        return;
     }
+    
+    try {
+        // Kiểm tra mã giảm giá
+        const apiUrl = `http://localhost:3003/discount-codes/${encodeURIComponent(code)}`;
+        console.log("Đang gọi API kiểm tra mã:", apiUrl);
 
-    let amount = 0;
+        const res = await fetch(apiUrl);
+        
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Lỗi API (Status != 200):", res.status, errorText);
+            setDiscountError("Mã giảm giá không hợp lệ hoặc đã hết hạn!");
+            // 🗑️ Xóa mã nếu có lỗi để đảm bảo checkout không bị lỗi
+            localStorage.removeItem("appliedDiscount"); 
+            return;
+        }
 
-    if (discount.type === "percent") {
-      amount = (totalSelected * discount.value) / 100;
-    } else {
-      amount = discount.value;
+        const data = await res.json();
+        
+        if (!data || !data.code) { 
+            console.error("Lỗi API (Dữ liệu rỗng hoặc thiếu code):", data); 
+            setDiscountError("Không tìm thấy mã hợp lệ!");
+            localStorage.removeItem("appliedDiscount");
+            return;
+        }
+
+        // Chuẩn hóa loại giảm giá và giá trị từ API
+        const discountTypeApi = data.type?.toLowerCase();
+        const discountTypeLegacy = data.loai_giam?.toLowerCase();
+
+        let type: Discount['type'];
+        if (discountTypeApi === 'percent' || discountTypeLegacy === 'phan_tram') {
+            type = "percent";
+        } else {
+            type = "fixed";
+        }
+        
+        const value = Number(data.gia_tri_giam || data.value) || 0;
+        const maxDiscount = Number(data.toi_da || data.maxDiscount) || undefined;
+        
+        const newDiscount: Discount = {
+            code: data.code, 
+            value: value,
+            type: type,
+            maxDiscount: maxDiscount
+        };
+
+        setAppliedDiscount(newDiscount);
+        setDiscountError(`Áp dụng mã ${data.code} thành công!`); 
+        
+        // 🚀 LƯU MÃ GIẢM GIÁ VÀO LOCAL STORAGE CHO TRANG CHECKOUT
+        if (typeof window !== 'undefined') {
+            localStorage.setItem("appliedDiscount", JSON.stringify(newDiscount));
+        }
+        
+    } catch (e: any) {
+        console.error("Lỗi mạng/Kết nối API:", e.message);
+        setDiscountError("Có lỗi xảy ra khi kiểm tra mã giảm giá (Lỗi Mạng/Kết nối).");
+        setAppliedDiscount(null);
+        localStorage.removeItem("appliedDiscount");
+    } finally {
+        setIsApplying(false);
     }
-
-    if (amount > totalSelected) amount = totalSelected;
-
-    setDiscountAmount(amount);
   };
+  
+  const removeDiscount = () => {
+    setAppliedDiscount(null);
+    setDiscountError("");
+    setDiscountCode("");
+    
+    // 🗑️ XÓA MÃ GIẢM GIÁ KHỎI LOCAL STORAGE
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem("appliedDiscount");
+    }
+  };
+
+  // Tính toán giá trị giảm giá (Dùng useMemo để tối ưu)
+  const discountAmount = useMemo(() => {
+    if (!appliedDiscount) return 0;
+    
+    let discountValue = 0;
+    
+    if (appliedDiscount.type === "percent") {
+      discountValue = Math.floor((totalSelected * appliedDiscount.value) / 100);
+      
+      // Áp dụng giới hạn giảm giá tối đa
+      if (appliedDiscount.maxDiscount && discountValue > appliedDiscount.maxDiscount) {
+        discountValue = appliedDiscount.maxDiscount;
+      }
+    } else { // fixed
+      discountValue = appliedDiscount.value;
+    }
+    
+    // Đảm bảo giảm giá không vượt quá tổng tiền
+    return Math.min(discountValue, totalSelected);
+    
+  }, [totalSelected, appliedDiscount]);
+  // ------------------------------------------------------------------
+  // END LOGIC MÃ GIẢM GIÁ
+  // ------------------------------------------------------------------
+
 
   const finalTotal = Math.max(totalSelected - discountAmount, 0);
 
@@ -140,21 +275,21 @@ export default function CartPage() {
     >
       {/* HEADER */}
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <Link href="/">
+        <Link href="/home">
           <button className="btn btn-outline-primary rounded-pill px-4 py-2 fw-semibold">
             ← Tiếp tục mua hàng
           </button>
         </Link>
-        <div className="flex-grow-1 text-center">
-          <h2 className="fw-bold text-primary m-0">
-            🛒 Giỏ hàng của bạn{" "}
-            <span className="badge bg-secondary ms-2">{cart.length}</span>
-          </h2>
-        </div>
+
+        <h2 className="fw-bold text-primary m-0 text-center flex-grow-1">
+          🛒 Giỏ hàng của bạn{" "}
+          <span className="badge bg-secondary ms-2">{cart.length}</span>
+        </h2>
+
         <div style={{ width: 150 }}></div>
       </div>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN */}
       {cart.length === 0 ? (
         <div className="text-center p-5">
           <img
@@ -164,7 +299,7 @@ export default function CartPage() {
           />
           <p className="mt-4 text-secondary">
             Giỏ hàng trống.{" "}
-            <Link href="/home" className="fw-bold text-primary">
+            <Link href="/products" className="fw-bold text-primary">
               Tiếp tục mua sắm →
             </Link>
           </p>
@@ -187,7 +322,7 @@ export default function CartPage() {
                         onChange={handleSelectAll}
                       />
                     </th>
-                    <th>Hình ảnh</th>
+                    <th>Hình</th>
                     <th>Tên sản phẩm</th>
                     <th>Giá</th>
                     <th>Số lượng</th>
@@ -195,6 +330,7 @@ export default function CartPage() {
                     <th></th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {cart.map((item) => (
                     <tr
@@ -212,6 +348,7 @@ export default function CartPage() {
                           onChange={() => toggleSelect(item.id)}
                         />
                       </td>
+
                       <td>
                         <img
                           src={item.image}
@@ -224,10 +361,13 @@ export default function CartPage() {
                           }}
                         />
                       </td>
+
                       <td className="text-start fw-semibold">{item.name}</td>
+
                       <td className="text-danger fw-bold">
                         {formatPrice(item.price)}
                       </td>
+
                       <td>
                         <div className="d-inline-flex align-items-center gap-2 bg-light rounded-pill px-3 py-1">
                           <button
@@ -236,7 +376,9 @@ export default function CartPage() {
                           >
                             <FaMinus />
                           </button>
+
                           <span className="fw-bold">{item.quantity}</span>
+
                           <button
                             className="btn btn-outline-secondary btn-sm"
                             onClick={() => updateQuantity(item.id, 1)}
@@ -245,9 +387,11 @@ export default function CartPage() {
                           </button>
                         </div>
                       </td>
+
                       <td className="text-danger fw-bold">
                         {formatPrice(item.price * item.quantity)}
                       </td>
+
                       <td>
                         <button
                           className="btn btn-outline-danger btn-sm"
@@ -272,7 +416,7 @@ export default function CartPage() {
               <h5 className="fw-bold mb-3 text-primary">Tóm tắt đơn hàng</h5>
               <hr />
 
-              {/* ✅ MÃ GIẢM GIÁ */}
+              {/* DISCOUNT */}
               <label className="fw-semibold">Mã giảm giá:</label>
               <div className="d-flex gap-2 mb-2">
                 <input
@@ -281,22 +425,38 @@ export default function CartPage() {
                   placeholder="Nhập mã giảm giá..."
                   value={discountCode}
                   onChange={(e) => setDiscountCode(e.target.value)}
+                  disabled={!!appliedDiscount || isApplying}
                 />
-                <button
-                  className="btn btn-primary"
-                  onClick={applyDiscount}
-                >
-                  Áp dụng
-                </button>
+                {!appliedDiscount ? (
+                    <button 
+                        className="btn btn-primary" 
+                        onClick={applyDiscount}
+                        disabled={isApplying || !discountCode.trim() || selectedIds.length === 0}
+                    >
+                        {isApplying ? (
+                            <>
+                                <span className="spinner-border spinner-border-sm me-1"></span>
+                                Áp dụng
+                            </>
+                        ) : "Áp dụng"}
+                    </button>
+                ) : (
+                    <button 
+                        className="btn btn-outline-danger" 
+                        onClick={removeDiscount}
+                    >
+                        Xóa mã
+                    </button>
+                )}
               </div>
 
               {discountError && (
-                <p className="text-danger small">{discountError}</p>
+                <p className={`small ${appliedDiscount ? 'text-success' : 'text-danger'}`}>{discountError}</p>
               )}
 
-              {discountAmount > 0 && (
+              {discountAmount > 0 && appliedDiscount && (
                 <p className="text-success small fw-bold">
-                  ✅ Đã áp dụng: -{formatPrice(discountAmount)}
+                  ✅ Mã {appliedDiscount.code}: -{formatPrice(discountAmount)}
                 </p>
               )}
 
@@ -304,7 +464,9 @@ export default function CartPage() {
 
               <div className="d-flex justify-content-between mb-2">
                 <span>Tạm tính:</span>
-                <span className="fw-semibold">{formatPrice(totalSelected)}</span>
+                <span className="fw-semibold">
+                  {formatPrice(totalSelected)}
+                </span>
               </div>
 
               <div className="d-flex justify-content-between mb-2">
@@ -315,9 +477,12 @@ export default function CartPage() {
               </div>
 
               <hr />
+
               <div className="d-flex justify-content-between align-items-center">
                 <h5 className="fw-bold text-primary">Tổng thanh toán:</h5>
-                <h4 className="fw-bold text-danger">{formatPrice(finalTotal)}</h4>
+                <h4 className="fw-bold text-danger">
+                  {formatPrice(finalTotal)}
+                </h4>
               </div>
 
               <Link

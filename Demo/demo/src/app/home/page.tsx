@@ -2,7 +2,7 @@
 
 import AboutBookbuy from "@/components/AboutBookbuy";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Container,
   Row,
@@ -14,9 +14,6 @@ import {
   Badge,
   Alert
 } from "react-bootstrap";
-import { useRouter } from "next/navigation";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "./home.css";
 import React from "react";
 
 // ====== Interface ======
@@ -25,7 +22,7 @@ interface Book {
   ten_sach: string;
   ten_tac_gia: string;
   ten_NXB: string;
-  gia_sach: number;
+  gia_sach: number; // Đảm bảo đúng là gia_sach
   ton_kho_sach: number;
   mo_ta: string;
   gg_sach: number;
@@ -48,18 +45,101 @@ interface Discount {
   trang_thai?: number;
 }
 
+// ========= GENERIC NOTIFICATION COMPONENT =========
+const Notification = ({ message, show, variant, onClose }: { 
+    message: string; 
+    show: boolean; 
+    variant: 'success' | 'danger' | 'warning'; 
+    onClose: () => void 
+}) => {
+    useEffect(() => {
+        if (show) {
+            const timer = setTimeout(() => {
+                onClose();
+            }, 4000); // Ẩn sau 4 giây
+            return () => clearTimeout(timer);
+        }
+    }, [show, onClose]);
+
+    const titleMap = {
+        success: { text: "Thành công!", icon: "bi-check-circle-fill", bg: "#029e74", border: "#007d57" },
+        danger: { text: "Lỗi!", icon: "bi-x-octagon-fill", bg: "#dc3545", border: "#b02a37" },
+        warning: { text: "Cảnh báo!", icon: "bi-exclamation-triangle-fill", bg: "#ffc107", border: "#d9a400" },
+    };
+    const { text, icon, bg, border } = titleMap[variant];
+
+    if (!show) return null;
+
+    return (
+        <div 
+            style={{ 
+                position: 'fixed', 
+                top: '20px', 
+                left: '50%', 
+                transform: 'translateX(-50%)', 
+                zIndex: 1050, 
+                transition: 'opacity 0.3s ease-in-out',
+                maxWidth: '350px'
+            }}
+        >
+            <Alert 
+                variant={variant} 
+                onClose={onClose} 
+                dismissible 
+                className="shadow-lg border-0"
+                style={{ 
+                    borderRadius: '0.75rem', 
+                    background: bg, 
+                    color: (variant === 'warning' ? '#333' : 'white'), 
+                    border: `3px solid ${border}` 
+                }}
+            >
+                <Alert.Heading style={{ fontSize: '1.1rem' }}>
+                    <i className={`bi ${icon} me-2`}></i> {text}
+                </Alert.Heading>
+                <p className="mb-0 fw-semibold">{message}</p>
+            </Alert>
+        </div>
+    );
+};
+// ===============================================
+
+
 // ====== HOME PAGE ======
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [keyword, setKeyword] = useState("");
-  const [showCopiedCode, setShowCopiedCode] = useState<string | null>(null); // NEW: hiển thị mã vừa sao chép
-  const router = useRouter();
+  const [showCopiedCode, setShowCopiedCode] = useState<string | null>(null);
+  
+  // Trạng thái cho Notification
+  const [notification, setNotification] = useState<{
+    message: string;
+    show: boolean;
+    variant: 'success' | 'danger' | 'warning';
+  }>({ message: '', show: false, variant: 'success' });
 
-  useEffect(() => {
-    import("bootstrap/dist/js/bootstrap.bundle.min.js");
+  const showNotification = (
+    message: string,
+    variant: 'success' | 'danger' | 'warning'
+  ) => {
+    setNotification({ message, show: true, variant });
+  };
+  
+  const closeNotification = useCallback(() => {
+    setNotification(prev => ({ ...prev, show: false }));
   }, []);
+
+
+  // Thay thế useRouter bằng hàm chuyển hướng fallback
+  const router = {
+    push: (path: string) => {
+      // Sử dụng window.location.href để chuyển hướng trong môi trường sandboxed
+      window.location.href = path;
+    },
+  };
+  
 
   useEffect(() => {
     fetch("http://localhost:3003/books")
@@ -88,13 +168,14 @@ export default function Home() {
       });
   }, []);
 
-  // Thêm vào giỏ hàng - lưu localStorage và chuyển đến /cart
+  // handleAddToCart
   const handleAddToCart = (book: Book) => {
     try {
       // Lấy cart hiện tại
       const cartStr = localStorage.getItem("cart");
       let cart = cartStr ? JSON.parse(cartStr) : [];
       if (!Array.isArray(cart)) cart = [];
+
       // Kiểm tra đã có sách chưa, nếu có tăng số lượng, chưa có thì thêm mới
       const existedIndex = cart.findIndex(
         (item: any) => item.sach_id === book.sach_id
@@ -113,9 +194,16 @@ export default function Home() {
         });
       }
       localStorage.setItem("cart", JSON.stringify(cart));
-      router.push("/cart");
+      
+      // Hiển thị thông báo Notification
+      showNotification(
+        `Sách "${book.ten_sach}" đã được thêm vào giỏ hàng.`,
+        'success'
+      );
+
     } catch (err) {
-      alert("Không thể thêm vào giỏ hàng. Thử lại sau!");
+      console.error("Lỗi khi thêm vào giỏ hàng:", err);
+      showNotification("Không thể thêm vào giỏ hàng. Thử lại sau!", 'danger');
     }
   };
 
@@ -131,10 +219,11 @@ export default function Home() {
     return Number(price).toLocaleString("vi-VN") + "đ";
   };
 
+  // handleBuyNow
   const handleBuyNow = (book: Book) => {
     const storedUser = localStorage.getItem("user");
     if (!storedUser) {
-      alert("⚠️ Vui lòng đăng nhập để tiếp tục mua hàng!");
+      showNotification("⚠️ Vui lòng đăng nhập để tiếp tục mua hàng!", 'warning');
       router.push("/auth/dangnhap");
       return;
     }
@@ -142,7 +231,7 @@ export default function Home() {
     try {
       const user = JSON.parse(storedUser);
       if (!user || (!user.id && !user.ten && !user.email)) {
-        alert("⚠️ Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại!");
+        showNotification("⚠️ Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại!", 'warning');
         router.push("/auth/dangnhap");
         return;
       }
@@ -164,7 +253,7 @@ export default function Home() {
       router.push("/checkout");
     } catch (error) {
       console.error("❌ Lỗi khi xử lý mua ngay:", error);
-      alert("⚠️ Đã có lỗi xảy ra, vui lòng thử lại!");
+      showNotification("⚠️ Đã có lỗi xảy ra, vui lòng thử lại!", 'danger');
     }
   };
   
@@ -193,22 +282,58 @@ export default function Home() {
     return "Mã ưu đãi";
   };
 
-  // Custom: hiển thị lại mã giảm giá vừa sao chép cho user ("sao mã giảm giả mình mất rồi hiện lại cho mình")
+  // Custom: hiển thị lại mã giảm giá vừa sao chép cho user
   const handleCopyDiscount = (ma_gg: string) => {
-    navigator.clipboard.writeText(ma_gg)
-      .then(() => {
-        setShowCopiedCode(ma_gg);
-        setTimeout(() => setShowCopiedCode(null), 4500); // ẩn thông báo sau 4.5s, giúp user dễ nhìn lại mã vừa copy
-      })
-      .catch(() => {
-        alert("Không thể sao chép mã giảm giá. Hãy thử lại!");
-      });
+    // Sử dụng document.execCommand('copy') cho môi trường iFrame
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ma_gg)
+        .then(() => {
+            setShowCopiedCode(ma_gg);
+            setTimeout(() => setShowCopiedCode(null), 4500); // ẩn thông báo sau 4.5s
+        })
+        .catch(() => {
+            // Fallback: sử dụng execCommand
+            const textarea = document.createElement('textarea');
+            textarea.value = ma_gg;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                setShowCopiedCode(ma_gg);
+                setTimeout(() => setShowCopiedCode(null), 4500);
+            } catch (err) {
+                // Thay alert bằng console.error
+                console.error("Không thể sao chép mã giảm giá. Hãy thử lại!");
+            }
+            document.body.removeChild(textarea);
+        });
+    } else {
+        // Thay alert bằng console.error
+        console.error("Không thể sao chép mã giảm giá. Hãy thử lại!");
+    }
+  };
+
+  // Hàm định dạng giá kiểu Việt Nam (chuẩn, bỏ .00)
+  const formatVietnamesePrice = (price: number | string) => {
+    const num =
+      typeof price === "string" ? parseFloat(price) : price;
+    if (isNaN(num)) return "0đ";
+    return (
+      num.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ"
+    );
   };
 
   // ========== UI ==========
 
   return (
     <>
+      <Notification 
+        message={notification.message} 
+        show={notification.show} 
+        variant={notification.variant}
+        onClose={closeNotification} 
+      />
+
       {/* ======== HEADER & SEARCH ======== */}
       <Container
   fluid
@@ -304,12 +429,12 @@ export default function Home() {
             borderRadius: "2rem"
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.transform = "scale(1.03)";
-            e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.1)";
+            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.03)";
+            (e.currentTarget as HTMLImageElement).style.boxShadow = "0 12px 30px rgba(0,0,0,0.1)";
           }}
           onMouseOut={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
-            e.currentTarget.style.boxShadow = "none";
+            (e.currentTarget as HTMLImageElement).style.transform = "scale(1)";
+            (e.currentTarget as HTMLImageElement).style.boxShadow = "none";
           }}
         />
       </div>
@@ -426,55 +551,82 @@ export default function Home() {
         </Row>
         
       </Container>
+ {/* ========= DANH MỤC SÁCH (UI MỚI – KHÔNG ICON) ========= */}
+<Container className="mb-5">
+  <h2
+    className="fw-bold text-center mb-5"
+    style={{
+      color: "#ff9800",
+      fontSize: "2.2rem",
+      letterSpacing: "1px",
+      textTransform: "uppercase",
+    }}
+  >
+    Danh mục sách
+    <div
+      style={{
+        width: 80,
+        height: 4,
+        background: "#ff9800",
+        margin: "10px auto 0",
+        borderRadius: 10,
+      }}
+    ></div>
+  </h2>
 
-      {/* ========= DANH MỤC SÁCH ĐẸP ========= */}
-      <Container className="mb-5">
-        <h2 className="section-title mb-4 fw-bold text-center" style={{ color: "#ff9800" }}>
-          Danh mục sách
-        </h2>
-        {categories.length > 0 ? (
-          <Row className="justify-content-center g-4">
-            {categories.map((cat, idx) => {
-              return (
-                <Col
-                  key={cat.loai_sach_id}
-                  xs={6}
-                  sm={4}
-                  md={3}
-                  lg={2}
-                  className="d-flex align-items-stretch"
-                >
-                  <div
-                    onClick={() => router.push(`/category/${cat.loai_sach_id}`)}
-                    className="category-card bg-white p-4 pb-3 ps-3 pe-3 d-flex flex-column align-items-center text-center justify-content-center shadow rounded-4 w-100"
-                    style={{
-                      cursor: "pointer",
-                      transition: "transform 0.25s cubic-bezier(.19,1,.22,1), box-shadow 0.25s",
-                      border: "2px solid #fff0b7",
-                      height: "180px",
-                      gap: 10
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = "scale(1.09)";
-                      e.currentTarget.style.boxShadow = "0 16px 32px rgba(255,193,7,0.22)";
-                      e.currentTarget.style.borderColor = "#ffc107";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = "scale(1)";
-                      e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.07)";
-                      e.currentTarget.style.borderColor = "#fff0b7";
-                    }}
-                  >
-                    <span className="fw-semibold" style={{ fontSize: "1.08rem" }}>{cat.ten_loai}</span>
-                  </div>
-                </Col>
-              );
-            })}
-          </Row>
-        ) : (
-          <p className="text-center text-muted">Không có danh mục nào để hiển thị.</p>
-        )}
-      </Container>
+  {categories.length > 0 ? (
+    <Row className="justify-content-center g-4">
+      {categories.map((cat) => (
+        <Col key={cat.loai_sach_id} xs={6} sm={4} md={3} lg={2} className="d-flex">
+          <div
+            onClick={() => router.push(`/category/${cat.loai_sach_id}`)}
+            className="shadow-sm w-100 d-flex flex-column align-items-center rounded-4"
+            style={{
+              cursor: "pointer",
+              padding: "14px 10px",
+              background: "linear-gradient(145deg, #fff 0%, #fffdf5 100%)",
+              border: "2px solid #ffeab5",
+              transition: "all .28s ease",
+            }}
+            onMouseOver={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "translateY(-6px)";
+              (e.currentTarget as HTMLElement).style.boxShadow = "0 18px 32px rgba(255,193,7,0.3)";
+              (e.currentTarget as HTMLElement).style.borderColor = "#ffc107";
+            }}
+            onMouseOut={(e) => {
+              (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+              (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 14px rgba(0,0,0,0.08)";
+              (e.currentTarget as HTMLElement).style.borderColor = "#ffeab5";
+            }}
+          >
+            {/* ẢNH DANH MỤC */}
+            <img
+              src="https://nld.mediacdn.vn/2016/14-sach-sai-gon-pho-nha-tho-1479995951128.jpg"
+              alt={cat.ten_loai}
+              style={{
+                width: "100%",
+                height: 110,
+                objectFit: "cover",
+                borderRadius: "14px",
+                marginBottom: 12,
+                border: "1.5px solid #ffe2a8",
+              }}
+            />
+
+            <span
+              className="fw-semibold text-dark text-center"
+              style={{ fontSize: "1.08rem", lineHeight: "1.3" }}
+            >
+              {cat.ten_loai}
+            </span>
+          </div>
+        </Col>
+      ))}
+    </Row>
+  ) : (
+    <p className="text-center text-muted">Không có danh mục nào để hiển thị.</p>
+  )}
+</Container>
 
       {/* ========= MÃ GIẢM GIÁ nổi bật - HIỂN THỊ RÕ RÀNG ========= */}
       <Container className="my-5" style={{ 
@@ -491,7 +643,7 @@ export default function Home() {
             letterSpacing: ".05em",
             textShadow: "2px 2px 4px rgba(255, 215, 0, 0.3)"
           }}>
-            MÃ GIẢM GIÁ ĐỘC QUYỀN
+            MÃ GIẢM GIÁ 
           </h2>
           <p className="text-muted mb-4" style={{ fontSize: "1.1rem" }}>
             Sao chép mã và sử dụng ngay khi thanh toán để được giảm giá
@@ -601,12 +753,12 @@ export default function Home() {
                       cursor: "pointer"
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-8px) scale(1.03)";
-                      e.currentTarget.style.boxShadow = "0 12px 40px rgba(255, 215, 0, 0.4)";
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(-8px) scale(1.03)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 12px 40px rgba(255, 215, 0, 0.4)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0) scale(1)";
-                      e.currentTarget.style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.1)";
+                      (e.currentTarget as HTMLElement).style.transform = "translateY(0) scale(1)";
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.1)";
                     }}
                   >
                     <div className="p-4">
@@ -699,16 +851,6 @@ export default function Home() {
               ? Math.max(book.gia_sach - book.gg_sach, 0)
               : book.gia_sach;
 
-            //  Hàm định dạng giá kiểu Việt Nam (chuẩn, bỏ .00)
-            const formatVietnamesePrice = (price: number | string) => {
-              const num =
-                typeof price === "string" ? parseFloat(price) : price;
-              if (isNaN(num)) return "0đ";
-              return (
-                num.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ"
-              );
-            };
-
             return (
               <Col
                 key={`book-${book.sach_id}-${index}`}
@@ -728,11 +870,11 @@ export default function Home() {
                     position: "relative",
                   }}
                   onMouseOver={(e) =>
-                    (e.currentTarget.style.transform =
+                    ((e.currentTarget as HTMLElement).style.transform =
                       "translateY(-7px) scale(1.03)")
                   }
                   onMouseOut={(e) =>
-                    (e.currentTarget.style.transform = "scale(1)")
+                    ((e.currentTarget as HTMLElement).style.transform = "scale(1)")
                   }
                   onClick={() => router.push(`/products/${book.sach_id}`)}
                 >
@@ -870,7 +1012,7 @@ export default function Home() {
   </h2>
 
   <Row className="gy-4 align-items-stretch">
-    {/* SÁCH MỚI NỔI BẬT */}
+    {/* SÁCH GIẢM GIÁ */}
     <Col xs={12}>
       <h4
         className="fw-bold text-success text-center mb-3"
@@ -885,17 +1027,7 @@ export default function Home() {
             const hasDiscount = book.gg_sach > 0;
             const finalPrice = hasDiscount
               ? Math.max(book.gia_sach - book.gg_sach, 0)
-              : book.gia_sach;
-
-            //  Hàm định dạng giá kiểu Việt Nam (chuẩn, bỏ .00)
-            const formatVietnamesePrice = (price: number | string) => {
-              const num =
-                typeof price === "string" ? parseFloat(price) : price;
-              if (isNaN(num)) return "0đ";
-              return (
-                num.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ"
-              );
-            };
+              : book.gia_sach; // ĐÃ SỬA: từ book.gia_ach sang book.gia_sach
 
             return (
               <Col
@@ -916,11 +1048,11 @@ export default function Home() {
                     position: "relative",
                   }}
                   onMouseOver={(e) =>
-                    (e.currentTarget.style.transform =
+                    ((e.currentTarget as HTMLElement).style.transform =
                       "translateY(-7px) scale(1.03)")
                   }
                   onMouseOut={(e) =>
-                    (e.currentTarget.style.transform = "scale(1)")
+                    ((e.currentTarget as HTMLElement).style.transform = "scale(1)")
                   }
                   onClick={() => router.push(`/products/${book.sach_id}`)}
                 >
@@ -1028,7 +1160,7 @@ export default function Home() {
                           handleAddToCart(book);
                         }}
                       >
-                        Thêm vào Giỏ hàng
+                        Thêm Vào Giỏ hàng
                       </Button>
                     </div>
                   </Card.Body>
@@ -1045,9 +1177,8 @@ export default function Home() {
     </Col>
   </Row>
 </Container>
-
 {/* ========== ABOUT & NEWS ========== */}
-      <AboutBookbuy />
+<AboutBookbuy />
 {/* ================ News Section ================ */}
 <Container className="my-5">
       <h2
@@ -1134,6 +1265,16 @@ export default function Home() {
         ))}
       </Row>
     </Container>
+    {/* Bổ sung CDN cho Bootstrap CSS và JS - Đã loại bỏ integrity và crossOrigin */}
+    <link 
+      rel="stylesheet" 
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" 
+    />
+    <script 
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" 
+    ></script>
+    {/* Import Bootstrap Icons CSS cho các icon */}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"></link>
     </>
   );
 }

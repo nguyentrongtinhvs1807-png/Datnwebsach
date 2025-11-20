@@ -465,23 +465,7 @@ export default function BookDetail() {
                   )
                 )}
               </div>
-              {/* Nút thêm & mua */}
-              <div className="d-flex justify-content-center gap-3 mb-4 flex-wrap">
-                <button
-                  className="custom-btn1 flex-fill"
-                  onClick={addToCart}
-                  style={{ minWidth: 170 }}
-                >
-                  Thêm vào giỏ hàng
-                </button>
-                <button
-                  className="custom-btn2 flex-fill"
-                  onClick={buyNow}
-                  style={{ minWidth: 170 }}
-                >
-                  Mua ngay
-                </button>
-              </div>
+              
               {/* Chính sách/ưu đãi */}
               <div className="policy-box text-start mt-3">
                 <div className="fw-bold text-warning mb-2" style={{ letterSpacing: 0.4 }}>Chính sách ưu đãi</div>
@@ -541,17 +525,6 @@ export default function BookDetail() {
                   </div>
                 </div>
               </div>
-              {/* Flash Sale */}
-              <div className="noti-flash-sale mb-3 text-center">
-                <span style={{ marginRight: 10 }}> FLASH SALE</span>
-                <span style={{
-                  color: "#fd6b64",
-                  fontWeight: 700,
-                  letterSpacing: "0.5px"
-                }}>
-                  Thời gian còn lại: {formatTime(flashSaleTime)}
-                </span>
-              </div>
               {/* Giá */}
               <div className="mb-4">
                 {book.gg_sach > 0 ? (
@@ -568,71 +541,58 @@ export default function BookDetail() {
               </div>
               {/* Số lượng và tồn kho */}
               <div className="d-flex align-items-center mb-4 flex-wrap gap-3">
-                <label className="fw-semibold" style={{ color: "#c28f17" }}>
-                  Số lượng:
-                </label>
-                <div className="input-group" style={{ maxWidth: 160 }}>
-                  <button
-                    className="btn"
-                    style={{
-                      background: "#ffebb2",
-                      color: "#c49111",
-                      border: "1.5px solid #ffd98f",
-                      fontSize: "1.25rem",
-                      fontWeight: 700,
-                      borderRadius: "8px 0 0 8px"
-                    }}
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    min={1}
-                    max={book.ton_kho_sach}
-                    value={quantity}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      if (!isNaN(val))
-                        setQuantity(Math.max(1, Math.min(book.ton_kho_sach, val)));
-                    }}
-                    className="form-control text-center"
-                    style={{ fontWeight: 500, fontSize: "1.12rem", borderLeft: "none", borderRight: "none" }}
-                  />
-                  <button
-                    className="btn"
-                    style={{
-                      background: "#ffe0a9",
-                      color: "#c49111",
-                      border: "1.5px solid #ffd98f",
-                      fontSize: "1.25rem",
-                      fontWeight: 700,
-                      borderRadius: "0 8px 8px 0"
-                    }}
-                    onClick={() =>
-                      setQuantity((q) => Math.min(book.ton_kho_sach, q + 1))
-                    }
-                  >
-                    +
-                  </button>
-                </div>
-                <span className="ms-2 text-muted small" style={{ fontWeight: 500 }}>
-                  Còn lại:{" "}
-                  <span style={{
-                    color:
-                      book.ton_kho_sach > 10
-                        ? "#38c132"
-                        : book.ton_kho_sach > 0
-                          ? "#f7aa19"
-                          : "#e94b2b",
-                    fontWeight: 700,
-                  }}>
-                    {book.ton_kho_sach > 0
-                      ? `${book.ton_kho_sach} sản phẩm`
-                      : "Hết hàng"}
-                  </span>
-                </span>
-              </div>
+      <label className="fw-semibold" style={{ color: "#c28f17" }}>
+        Số lượng:
+      </label>
+      
+      {/*
+        Đã loại bỏ input-group và các nút tăng/giảm.
+        Sử dụng input type="number" cho phép người dùng nhập trực tiếp hoặc dùng spinner mặc định.
+      */}
+      <input
+        type="number"
+        min={1}
+        max={book.ton_kho_sach}
+        value={quantity}
+        onChange={(e) => {
+          const val = Number(e.target.value);
+          // Đảm bảo số lượng luôn nằm trong khoảng [1, book.ton_kho_sach]
+          if (!isNaN(val))
+            setQuantity(Math.max(1, Math.min(book.ton_kho_sach, val)));
+        }}
+        className="form-control text-center"
+        style={{
+          fontWeight: 500,
+          fontSize: "1.12rem",
+          maxWidth: 160, // Giữ kích thước cố định
+          borderRadius: "8px", // Đảm bảo góc tròn cho ô input
+          // CSS tùy chỉnh để ẩn các nút spinner mặc định của trình duyệt (tùy chọn)
+          // Để người dùng chỉ nhập, bạn có thể thêm:
+          /*
+          MozAppearance: 'textfield', // Cho Firefox
+          WebkitAppearance: 'none',  // Cho Chrome/Safari
+          appearance: 'none',
+          */
+        }}
+      />
+      
+      <span className="ms-2 text-muted small" style={{ fontWeight: 500 }}>
+        Còn lại:{" "}
+        <span style={{
+          color:
+            book.ton_kho_sach > 10
+              ? "#38c132"
+              : book.ton_kho_sach > 0
+                ? "#f7aa19"
+                : "#e94b2b",
+          fontWeight: 700,
+        }}>
+          {book.ton_kho_sach > 0
+            ? `${book.ton_kho_sach} sản phẩm`
+            : "Hết hàng"}
+        </span>
+      </span>
+    </div>
               {/* Thanh tiến trình đã bán */}
               <div className="mb-3">
                 <div className="mb-1" style={{ fontWeight: "500", color: "#da9800" }}>
@@ -644,6 +604,23 @@ export default function BookDetail() {
                     style={{ width: `${(sold / totalStock) * 100}%` }}
                   ></div>
                 </div>
+              </div>
+              {/* Nút thêm & mua */}
+              <div className="d-flex justify-content-center gap-3 mb-4 flex-wrap">
+                <button
+                  className="custom-btn1 flex-fill"
+                  onClick={addToCart}
+                  style={{ minWidth: 170 }}
+                >
+                  Thêm vào giỏ hàng
+                </button>
+                <button
+                  className="custom-btn2 flex-fill"
+                  onClick={buyNow}
+                  style={{ minWidth: 170 }}
+                >
+                  Mua ngay
+                </button>
               </div>
               {/* Mô tả */}
               <div className="product-desc">

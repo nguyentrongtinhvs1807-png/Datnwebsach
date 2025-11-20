@@ -188,3 +188,7 @@ footer a:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 25px rgba(255, 193, 7, 0.3);
 }
+body {
+  font-family: 'Be Vietnam Pro', 'Inter', 'Roboto', sans-serif;
+}
+

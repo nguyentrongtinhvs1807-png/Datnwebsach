@@ -1,78 +1,142 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { Dropdown } from "react-bootstrap";
+// Sử dụng imports gốc của Next.js
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Dropdown } from 'react-bootstrap';
 
+// Định nghĩa kiểu dữ liệu cho người dùng
 type UserShape = {
   id?: number;
   ten?: string;
   email?: string;
-  role?: string | number;
+  // Chuẩn hóa role và vai_tro thành string hoặc number
+  role?: string | number; 
   vai_tro?: string | number;
+};
+
+// Hàm tính số lượng sản phẩm từ localStorage (đặt ngoài component để tránh re-creation)
+const calculateCartCount = (): number => {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const cart = localStorage.getItem('cart');
+    // Giả sử 'cart' lưu trữ mảng các sản phẩm
+    const items = cart ? JSON.parse(cart) : [];
+    // Tính tổng số lượng (quantity) của tất cả sản phẩm
+    const totalCount = items.reduce(
+      (total: number, item: any) => total + (item.quantity || 1),
+      0
+    );
+    return totalCount;
+  } catch {
+    console.error('Lỗi khi phân tích giỏ hàng từ localStorage.');
+    return 0;
+  }
 };
 
 export default function Header() {
   const [user, setUser] = useState<UserShape | null>(null);
-  const [query, setQuery] = useState<string>("");
-  const router = useRouter();
-  const pathname = usePathname(); 
+  const [query, setQuery] = useState<string>('');
+  const [cartItemCount, setCartItemCount] = useState<number>(0);
 
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Dùng useMemo để tính toán isAdmin chỉ khi 'user' thay đổi
+  const isAdmin = useMemo(() => {
+    return Boolean(
+      user &&
+        (user.role === 'admin' ||
+          user.vai_tro === 'admin' ||
+          Number(user.role) === 1 ||
+          Number(user.vai_tro) === 1)
+    );
+  }, [user]);
+
+  // useEffect để xử lý các tác vụ chỉ chạy trên client (localStorage, event listeners)
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("user");
-    if (stored) {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
       try {
-        setUser(JSON.parse(stored));
+        setUser(JSON.parse(storedUser));
       } catch {
         setUser(null);
       }
     }
-
+  
+    // ⭐ CHỈ CẬP NHẬT CART KHI ĐĂNG NHẬP
+    const token = localStorage.getItem("token");
+    if (token) {
+      setCartItemCount(calculateCartCount());
+    } else {
+      setCartItemCount(0);
+    }
+  
+    // --- Thiết lập Listeners ---
     const handleLogin = () => {
-      const s = localStorage.getItem("user");
-      if (s) setUser(JSON.parse(s));
-      else setUser(null);
+      const s = localStorage.getItem('user');
+      if (s) {
+        try {
+          setUser(JSON.parse(s));
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+  
+      // ⭐ cập nhật lại giỏ hàng sau đăng nhập
+      const tokenAfter = localStorage.getItem("token");
+      setCartItemCount(tokenAfter ? calculateCartCount() : 0);
     };
-
-    window.addEventListener("login", handleLogin);
-    return () => window.removeEventListener("login", handleLogin);
+  
+    const handleCartUpdate = () => {
+      const tokenNow = localStorage.getItem("token");
+      setCartItemCount(tokenNow ? calculateCartCount() : 0);
+    };
+  
+    window.addEventListener('login', handleLogin);
+    window.addEventListener('cart-update', handleCartUpdate);
+  
+    return () => {
+      window.removeEventListener('login', handleLogin);
+      window.removeEventListener('cart-update', handleCartUpdate);
+    };
   }, []);
+  
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
     setUser(null);
-    router.push("/auth/dangnhap");
+    router.push('/auth/dangnhap');
   };
-
-  const isAdmin = Boolean(
-    user &&
-      (user.role === "admin" ||
-        user.vai_tro === "admin" ||
-        Number(user.role) === 1 ||
-        Number(user.vai_tro) === 1)
-  );
 
   const onSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const q = query.trim();
-    router.push(q ? `/products?q=${encodeURIComponent(q)}` : "/products");
+    router.push(q ? `/products?q=${encodeURIComponent(q)}` : '/products');
   };
 
-  // ✅ Nếu đang ở trang /admin => chỉ hiển thị icon người dùng
-  if (pathname?.startsWith("/admin")) {
+  // ==========================================================
+  // LOGIC HIỂN THỊ: PHÂN BIỆT ADMIN VÀ CLIENT
+  // ==========================================================
+  
+  // 1. Giao diện tối giản khi đang ở trang ADMIN
+  if (pathname?.startsWith('/admin')) {
     return (
       <header className="admin-header p-3 d-flex justify-content-end bg-white border-bottom shadow-sm">
         {user ? (
           <Dropdown align="end">
+            {/* ... Phần dropdown menu đã có ... */}
             <Dropdown.Toggle variant="light" id="dropdown-user" className="user-toggle">
               <i className="bi bi-person-circle fs-4"></i>
             </Dropdown.Toggle>
             <Dropdown.Menu align="end">
-              <Dropdown.Item as={Link} href="/account">Tài khoản của tôi</Dropdown.Item>
-              <Dropdown.Item as={Link} href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
+              <Dropdown.Item href="/account">Tài khoản của tôi</Dropdown.Item>
+              <Dropdown.Item href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
+              <Dropdown.Item href="/orders">Đơn hàng của bạn</Dropdown.Item>
               <Dropdown.Divider />
               <Dropdown.Item onClick={handleLogout} className="text-danger">
                 Đăng xuất
@@ -88,7 +152,7 @@ export default function Header() {
     );
   }
 
-  // ✅ Giao diện header bình thường (ngoài trang admin)
+  // 2. Giao diện đầy đủ cho các trang CLIENT/GUEST
   return (
     <>
       <header className="site-header shadow-sm">
@@ -106,13 +170,12 @@ export default function Header() {
             <Link href="/policy" className="nav-link">Chính sách</Link>
             <Link href="/contact" className="nav-link">Liên hệ</Link>
             <Link href="/about" className="nav-link">Giới thiệu</Link>
-            <Link href="/orders" className="nav-link">Đơn hàng của bạn</Link>
           </nav>
 
-          {/* SEARCH + USER + CART */}
+          {/* SEARCH + HOTLINE + CART + USER */}
           <div className="header-right d-flex align-items-center gap-4">
             {/* SEARCH */}
-            <form className="search-form d-flex" onSubmit={onSearchSubmit}>
+            <form className="search-form" onSubmit={onSearchSubmit}>
               <input
                 type="text"
                 placeholder="🔍 Tìm sách, truyện, dụng cụ..."
@@ -131,28 +194,36 @@ export default function Header() {
               <strong>0857 226 757</strong>
             </div>
 
-            {/* USER */}
+            {/* CART */}
+            <Link href="/cart" className="btn btn-outline-dark position-relative cart-btn">
+              <i className="bi bi-bag-fill fs-5"></i> 
+              {cartItemCount > 0 && (
+                <span className="cart-badge badge rounded-pill bg-danger">
+                  {cartItemCount > 99 ? '99+' : cartItemCount}
+                </span>
+              )}
+            </Link>
+
+            {/* USER DROP DOWN */}
             {user ? (
               <Dropdown align="end">
                 <Dropdown.Toggle variant="light" id="dropdown-user" className="user-toggle">
                   <i className="bi bi-person-circle fs-4"></i>
                 </Dropdown.Toggle>
                 <Dropdown.Menu align="end">
-                  {isAdmin ? (
+                  <Dropdown.Item href="/account">Tài khoản của tôi</Dropdown.Item>
+                  <Dropdown.Item href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
+                  <Dropdown.Item href="/orders">Đơn hàng của bạn</Dropdown.Item>
+                  
+                  {isAdmin && (
                     <>
-                      <Dropdown.Item as={Link} href="/account">Tài khoản của tôi</Dropdown.Item>
-                      <Dropdown.Item as={Link} href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
                       <Dropdown.Divider />
-                      <Dropdown.Item as={Link} href="/admin" className="text-primary fw-semibold">
+                      <Dropdown.Item href="/admin" className="text-primary fw-semibold">
                         🔧 Trang quản trị
                       </Dropdown.Item>
                     </>
-                  ) : (
-                    <>
-                      <Dropdown.Item as={Link} href="/account">Tài khoản của tôi</Dropdown.Item>
-                      <Dropdown.Item as={Link} href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
-                    </>
                   )}
+                  
                   <Dropdown.Divider />
                   <Dropdown.Item onClick={handleLogout} className="text-danger">
                     Đăng xuất
@@ -164,17 +235,13 @@ export default function Header() {
                 Đăng nhập
               </Link>
             )}
-
-            {/* CART */}
-            <Link href="/cart" className="btn btn-outline-dark btn-sm position-relative cart-btn">
-              <i className="bi bi-bag-fill"></i>
-            </Link>
           </div>
         </div>
       </header>
 
-      {/* STYLE */}
+      {/* STYLE (jsx style block) */}
       <style jsx>{`
+        /* ... CSS của bạn ... */
         .site-header {
           background: #fff;
           position: sticky;
@@ -184,7 +251,7 @@ export default function Header() {
         }
 
         .header-inner {
-          padding: 0.9rem 0;
+          padding: 1.25rem 0; 
         }
 
         .logo-img {
@@ -198,12 +265,11 @@ export default function Header() {
           font-weight: 700;
           color: #2c3e50;
           font-size: 1.1rem;
-          margin-left: 10px;
+          margin-left: 12px;
         }
 
-        /* NAV LINK */
         .header-nav {
-          gap: 1.6rem;
+          gap: 1.8rem; 
         }
 
         .header-nav .nav-link {
@@ -220,19 +286,19 @@ export default function Header() {
           transform: translateY(-2px);
         }
         
-
-        /* SEARCH */
         .search-form {
           display: flex;
-          align-items: center;
-          gap: 0.4rem;
+          align-items: stretch;
         }
 
         .search-input {
-          width: 240px;
+          width: 260px; 
           border-radius: 25px;
-          border: 1px solid #e6e6e6;
-          padding: 0.5rem 1rem;
+          border-top-right-radius: 0; 
+          border-bottom-right-radius: 0;
+          border-right: 1px solid #e6e6e6; 
+          border-color: #e6e6e6;
+          padding: 0.6rem 1rem;
           transition: all 0.2s;
         }
 
@@ -240,15 +306,20 @@ export default function Header() {
           outline: none;
           border-color: #ffc107;
           box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
+          position: relative; 
+          z-index: 2;
         }
 
         .btn-search {
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
+          margin-left: -1px; 
+          border-radius: 0 25px 25px 0;
+          width: 50px; 
+          height: auto;
           display: flex;
           align-items: center;
           justify-content: center;
+          position: relative;
+          z-index: 1;
         }
 
         .user-toggle {
@@ -260,14 +331,30 @@ export default function Header() {
           display: flex;
           align-items: center;
           justify-content: center;
+          padding: 0.5rem 0.8rem;
+          border-radius: 8px;
+          transition: all 0.2s;
+        }
+        
+        .cart-badge {
+          position: absolute;
+          top: -10px;
+          right: -10px;
+          padding: 0.3em 0.6em;
+          font-size: 0.8em;
+          font-weight: 700;
+          line-height: 1;
+          z-index: 10;
+          border: 3px solid #fff;
         }
 
+        /* Responsive Adjustments */
         @media (max-width: 991px) {
           .header-nav {
             display: none;
           }
           .search-input {
-            width: 160px;
+            width: 180px; 
           }
         }
 
@@ -280,10 +367,26 @@ export default function Header() {
             height: 48px;
           }
           .search-input {
-            width: 130px;
+            width: 140px; 
+            padding: 0.5rem 0.8rem;
+          }
+          .btn-search {
+            width: 40px; 
+            height: auto;
           }
           .hotline {
             display: none;
+          }
+          .header-right {
+            gap: 0.8rem !important; 
+          }
+          .cart-btn {
+             padding: 0.4rem 0.6rem;
+          }
+          .cart-badge {
+             top: -5px; 
+             right: -5px;
+             font-size: 0.7em;
           }
         }
       `}</style>

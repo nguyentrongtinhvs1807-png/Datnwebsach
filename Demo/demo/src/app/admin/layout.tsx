@@ -12,11 +12,13 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
-      <body>
-        {children}
-        <BootstrapClient />
-      </body>
-    </html>
+    // THAY THẾ bằng một thẻ <div> hoặc Fragment (<>) để bao bọc nội dung
+    <div className="admin-page-wrapper">
+      {/* Đây sẽ là nơi bạn đặt Header, Sidebar hoặc cấu trúc chung của Admin */}
+      
+      {children}
+      
+      <BootstrapClient />
+    </div>
   );
 }

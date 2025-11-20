@@ -35,7 +35,6 @@ export default function LoginForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        // Nếu sai mật khẩu hoặc lỗi đăng nhập → hiện thêm link "Quên mật khẩu?"
         if (thongbaoRef.current)
           thongbaoRef.current.innerHTML = `
             <div class="alert alert-danger py-2 text-center">
@@ -47,13 +46,14 @@ export default function LoginForm() {
         return;
       }
 
-      // Lưu thông tin đăng nhập
+      // Lưu vào localStorage
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.user.role);
 
       window.dispatchEvent(new Event("login"));
 
+      // Điều hướng theo role
       if (data.user.role === "admin") router.push("/admin");
       else router.push("/home");
 
@@ -96,8 +96,7 @@ export default function LoginForm() {
                 className="px-4 pt-5 pb-3 text-center"
                 style={{
                   borderRadius: "1.7rem 1.7rem 0 0",
-                  background:
-                    "linear-gradient(88deg,#fdecad 70%, #fbeee5 100%)",
+                  background: "linear-gradient(88deg,#fdecad 70%, #fbeee5 100%)",
                   boxShadow: "0px 2px 28px #ffeebb35",
                 }}
               >
@@ -123,6 +122,7 @@ export default function LoginForm() {
                   Để tiếp tục, hãy nhập email và mật khẩu của bạn phía dưới.
                 </div>
               </div>
+
               <Card.Body className="py-4 px-4">
                 <Form onSubmit={handleLogin}>
                   <Form.Group className="mb-3">
@@ -171,7 +171,7 @@ export default function LoginForm() {
                     />
                   </Form.Group>
 
-                  {/* Thông báo lỗi / thành công */}
+                  {/* Thông báo */}
                   <div ref={thongbaoRef} className="mb-2"></div>
 
                   <div className="d-grid mb-3">
@@ -194,6 +194,7 @@ export default function LoginForm() {
                       Đăng nhập
                     </Button>
                   </div>
+
                   <div
                     className="text-center text-muted"
                     style={{
@@ -206,11 +207,11 @@ export default function LoginForm() {
                     <Link
                       href="/auth/dangky"
                       className="text-warning fw-semibold text-decoration-none"
-                      style={{ color: "#e5a317" }}
                     >
                       Đăng ký ngay
                     </Link>
                   </div>
+
                   <div
                     className="text-center"
                     style={{ marginTop: 3, fontSize: "1.01rem" }}
@@ -233,6 +234,7 @@ export default function LoginForm() {
           </Col>
         </Row>
       </Container>
+
       <style jsx global>{`
         body {
           background: none !important;

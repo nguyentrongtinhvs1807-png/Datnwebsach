@@ -25,7 +25,7 @@ export default function EditSachPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // ✅ Lấy dữ liệu sách theo ID
+  // 🟦 Lấy dữ liệu theo ID
   useEffect(() => {
     if (!id) return;
 
@@ -43,38 +43,62 @@ export default function EditSachPage() {
       .finally(() => setLoading(false));
   }, [id, router]);
 
-  // ✅ Cập nhật state khi người dùng thay đổi input
+  // 🟩 Xử lý thay đổi input (ép kiểu số + fix dấu phẩy)
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     if (!sach) return;
-    setSach({ ...sach, [e.target.name]: e.target.value });
+
+    const { name, value, type } = e.target;
+
+    let newValue: any = value;
+
+    if (type === "number") {
+      newValue = Number(value.replace(",", "."));
+    }
+
+    setSach({ ...sach, [name]: newValue });
   };
 
-  // ✅ Gửi PUT để lưu thay đổi
+  // 🟥 Gửi PUT cập nhật
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sach) return;
 
     setSaving(true);
+
+    // Gửi đúng field backend yêu cầu
+    const payload = {
+      ten_sach: sach.ten_sach,
+      ten_tac_gia: sach.ten_tac_gia,
+      ten_NXB: sach.ten_NXB,
+      gia_sach: sach.gia_sach,
+      ton_kho_sach: sach.ton_kho_sach,
+      gg_sach: sach.gg_sach,
+      loai_bia: sach.loai_bia,
+      mo_ta: sach.mo_ta,
+    };
+
     try {
       const res = await fetch(`http://localhost:3003/sachs/${sach.sach_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sach),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("Cập nhật thất bại!");
+
       alert("✅ Cập nhật sách thành công!");
       router.push("/admin/products");
     } catch (err) {
-      console.error("❌", err);
+      console.error("❌ Lỗi cập nhật:", err);
       alert("Đã xảy ra lỗi khi cập nhật sách!");
     } finally {
       setSaving(false);
     }
   };
 
+  // 🟨 Loading UI
   if (loading)
     return (
       <div className="text-center mt-5">
@@ -90,14 +114,16 @@ export default function EditSachPage() {
       </p>
     );
 
+  // 🟧 UI Form
   return (
     <div className="min-h-screen bg-light py-5">
       <div className="container">
-        <Card className="shadow-lg border-0 rounded-4 p-4 mx-auto" style={{ maxWidth: "700px" }}>
+        <Card
+          className="shadow-lg border-0 rounded-4 p-4 mx-auto"
+          style={{ maxWidth: "700px" }}
+        >
           <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-            <h3 className="fw-bold text-primary m-0">
-              ✏️ Cập nhật thông tin sách
-            </h3>
+            <h3 className="fw-bold text-primary m-0">✏️ Cập nhật thông tin sách</h3>
             <Button
               variant="outline-secondary"
               size="sm"
@@ -107,7 +133,7 @@ export default function EditSachPage() {
             </Button>
           </div>
 
-          <Form onSubmit={handleSubmit} className="space-y-3">
+          <Form onSubmit={handleSubmit}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold">Tên sách</Form.Label>
               <Form.Control
@@ -131,6 +157,7 @@ export default function EditSachPage() {
                   />
                 </Form.Group>
               </div>
+
               <div className="col-md-6">
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold">Nhà xuất bản</Form.Label>
@@ -157,6 +184,7 @@ export default function EditSachPage() {
                   />
                 </Form.Group>
               </div>
+
               <div className="col-md-4">
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold">Giảm giá (₫)</Form.Label>
@@ -168,6 +196,7 @@ export default function EditSachPage() {
                   />
                 </Form.Group>
               </div>
+
               <div className="col-md-4">
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold">Tồn kho</Form.Label>
@@ -181,19 +210,15 @@ export default function EditSachPage() {
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold">Loại bìa</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="loai_bia"
-                    value={sach.loai_bia}
-                    onChange={handleChange}
-                  />
-                </Form.Group>
-              </div>
-            </div>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Loại bìa</Form.Label>
+              <Form.Control
+                type="text"
+                name="loai_bia"
+                value={sach.loai_bia}
+                onChange={handleChange}
+              />
+            </Form.Group>
 
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold">Mô tả</Form.Label>
