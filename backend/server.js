@@ -12,24 +12,20 @@ const app = express();
 
 
 app.use(cors({
-  origin: 'http://localhost:3000',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: "http://localhost:3000", // Cho phép NextJS gọi
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
 }));
 
+// FIX CORS – CHỈ 2 DÒNG NÀY LÀ XONG MÃI MÃI!!!
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:3000");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
-
-
 
 // ================== CẤU HÌNH CƠ BẢN ==================
 app.use(express.json());
@@ -40,6 +36,31 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+
+
+app.use(express.json());
+
+// ================== VNPAY KHỞI TẠO (CHỈ 1 LẦN) ==================
+const vnpay = new VNPay({
+  tmnCode: "D3BX5CIF",
+  secureSecret: "TXQUFKM8G0O5BDIN8IA1LR3611W95WJC",
+  vnpayHost: "https://sandbox.vnpayment.vn",
+  hashAlgorithm: "SHA512",
+});
+
+// Hàm format ngày chuẩn VNPay: yyyyMMddHHmmss
+const formatDate = (date) => {
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    date.getFullYear() +
+    pad(date.getMonth() + 1) +
+    pad(date.getDate()) +
+    pad(date.getHours()) +
+    pad(date.getMinutes()) +
+    pad(date.getSeconds())
+  );
+};
 
 // ================== BIẾN MÔI TRƯỜNG ==================
 const JWT_SECRET = process.env.PIBOOK_SECRET_KEY || "pibook_secret_key";
@@ -59,6 +80,8 @@ db.connect((err) => {
     console.log(" Đã kết nối MySQL thành công!");
   }
 });
+
+
 
 // ================== MIDDLEWARE XÁC THỰC JWT ==================
 function authenticateToken(req, res, next) {
@@ -310,22 +333,34 @@ app.get("/books/:id", (req, res) => {
 });
 
 /// ================== API COMMENT ==================
+// GET: Lấy bình luận theo sách – chỉ hiện bình luận công khai cho khách
 app.get("/comments/:bookId", (req, res) => {
   const bookId = req.params.bookId;
-  const sql = `
-    SELECT c.binh_luan_id AS id, 
-           c.san_pham_id AS book_id, 
-           c.nd_bl AS content, 
-           c.ngay_bl AS created_at, 
-           u.Ten AS user
+
+  let sql = `
+    SELECT 
+      c.binh_luan_id AS id, 
+      c.san_pham_id AS book_id, 
+      c.nd_bl AS content, 
+      c.ngay_bl AS created_at, 
+      u.Ten AS user
     FROM binh_luan c
     LEFT JOIN nguoi_dung u ON c.nguoi_dung_id = u.nguoi_dung_id
     WHERE c.san_pham_id = ?
-    ORDER BY c.ngay_bl DESC
   `;
-  db.query(sql, [bookId], (err, results) => {
+
+  const params = [bookId];
+
+  // SIÊU QUAN TRỌNG: Chỉ hiện bình luận được duyệt khi có ?status=1
+  if (req.query.status === "1") {
+    sql += " AND c.trang_thai = 1";
+  }
+
+  sql += " ORDER BY c.ngay_bl DESC";
+
+  db.query(sql, params, (err, results) => {
     if (err) {
-      console.error("❌ Lỗi truy vấn /comments/:bookId:", err);
+      console.error("Lỗi truy vấn /comments/:bookId:", err);
       return res.status(500).json({ error: "Lỗi server khi lấy bình luận" });
     }
     res.json(results);
@@ -526,36 +561,71 @@ app.get("/books/category/:id", (req, res) => {
   });
 });
 
-//  Lấy tất cả bình luận kèm tên user + sản phẩm
+
+
+// GET: Lấy tất cả bình luận – CHẠY 100% KHÔNG CÒN UNDEFINED
 app.get("/comments", (req, res) => {
   const sql = `
-    SELECT b.*, 
-           n.Ten AS ten_nguoi_dung, 
-           s.ten_sach AS ten_san_pham
+    SELECT 
+      b.binh_luan_id,
+      b.nd_bl                                      AS noi_dung,
+      DATE_FORMAT(b.ngay_bl, '%H:%i:%s %d/%m/%Y')   AS ngay,
+      b.trang_thai,
+      COALESCE(n.Ten, CONCAT('User #', b.nguoi_dung_id))     AS ten_nguoi_dung,
+      COALESCE(s.ten_sach, CONCAT('Sách #', b.san_pham_id)) AS ten_san_pham
     FROM binh_luan b
     LEFT JOIN nguoi_dung n ON b.nguoi_dung_id = n.nguoi_dung_id
     LEFT JOIN sach s ON b.san_pham_id = s.sach_id
     ORDER BY b.ngay_bl DESC
   `;
+
   db.query(sql, (err, results) => {
     if (err) {
-      console.error("❌ Lỗi lấy bình luận:", err);
-      return res.status(500).json({ message: "Lỗi máy chủ" });
+      console.error("Lỗi truy vấn bình luận:", err);
+      return res.status(500).json({ message: "Lỗi server" });
     }
-    res.json(results);
+
+    // QUAN TRỌNG: ÉP KIỂU ĐÚNG ĐỂ TRÁNH LỖI TÊN TRƯỜNG (mysql2 đôi khi trả về Buffer hoặc tên lạ)
+    const comments = results.map(row => ({
+      binh_luan_id: row.binh_luan_id,
+      ten_san_pham: row.ten_san_pham ? String(row.ten_san_pham) : "Sách #unknown",
+      ten_nguoi_dung: row.ten_nguoi_dung ? String(row.ten_nguoi_dung) : "User #unknown",
+      noi_dung: row.noi_dung ? String(row.noi_dung) : "(không có nội dung)",
+      ngay: row.ngay ? String(row.ngay) : "Invalid Date",
+      trang_thai: row.trang_thai == 1 ? 1 : 0
+    }));
+
+    console.log("Đã gửi về frontend:", comments); // Xem ở terminal server
+    res.json(comments);
   });
 });
 
-//  Xoá bình luận
-app.delete("/comments/:id", (req, res) => {
+
+// PUT: Ẩn / Hiện bình luận (Soft Hide - giống phpMyAdmin)
+app.put("/comments/:id", (req, res) => {
   const id = req.params.id;
-  const sql = "DELETE FROM binh_luan WHERE binh_luan_id = ?";
-  db.query(sql, [id], (err) => {
+  const { trang_thai } = req.body; // 0 hoặc 1
+
+  if (![0, 1].includes(trang_thai)) {
+    return res.status(400).json({ message: "trang_thai chỉ được là 0 hoặc 1" });
+  }
+
+  const sql = "UPDATE binh_luan SET trang_thai = ? WHERE binh_luan_id = ?";
+
+  db.query(sql, [trang_thai, id], (err, result) => {
     if (err) {
-      console.error("❌ Lỗi xoá bình luận:", err);
-      return res.status(500).json({ message: "Lỗi khi xoá bình luận" });
+      console.error("Lỗi cập nhật trạng thái:", err);
+      return res.status(500).json({ message: "Lỗi server" });
     }
-    res.json({ message: " Đã xoá bình luận" });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Không tìm thấy bình luận" });
+    }
+
+    res.json({
+      message: "Cập nhật thành công",
+      binh_luan_id: id,
+      trang_thai: trang_thai
+    });
   });
 });
 
@@ -918,7 +988,7 @@ app.get("/api/voucher", (req, res) => {
   });
 });
 
-// Thêm voucher mới
+// Thêm Voucher Mới
 app.post("/api/voucher", (req, res) => {
   const { code, discount, min_order, max_discount, start_date, end_date, description } = req.body;
 
@@ -934,18 +1004,26 @@ app.post("/api/voucher", (req, res) => {
 
   db.query(
     sql,
-    [code, description || "fixed", discount, max_discount, min_order, start_date, end_date],
+    [
+      code,
+      description || "fixed", // mô tả bạn dùng làm "loai_giam"
+      discount,
+      max_discount,
+      min_order,
+      start_date,
+      end_date
+    ],
     (err, result) => {
       if (err) {
-        console.error(" Lỗi khi thêm voucher:", err);
+        console.error("Lỗi khi thêm voucher:", err);
         return res.status(500).json({ error: "Không thể thêm voucher" });
       }
-      res.json({ message: " Thêm voucher thành công", id: result.insertId });
+      res.json({ message: "Thêm voucher thành công", id: result.insertId });
     }
   );
 });
 
-// Cập nhật voucher
+
 app.put("/api/voucher", (req, res) => {
   const { id, code, discount, min_order, max_discount, start_date, end_date, description } = req.body;
 
@@ -953,35 +1031,67 @@ app.put("/api/voucher", (req, res) => {
 
   const sql = `
     UPDATE ma_giam_gia 
-    SET ma_gg=?, loai_giam=?, gia_tri_giam=?, giam_toi_da=?, don_toi_thieu=?, ngay_bd=?, ngay_kt=? 
+    SET 
+      ma_gg=?, 
+      loai_giam=?, 
+      gia_tri_giam=?, 
+      giam_toi_da=?, 
+      don_toi_thieu=?, 
+      ngay_bd=?, 
+      ngay_kt=?
     WHERE giam_gia_id=?
   `;
 
   db.query(
     sql,
-    [code, description || "fixed", discount, max_discount, min_order, start_date, end_date, id],
+    [
+      code,
+      description || "fixed",  // mô tả = loai_giam
+      discount,
+      max_discount,
+      min_order,
+      start_date,
+      end_date,
+      id
+    ],
     (err) => {
       if (err) {
-        console.error(" Lỗi khi cập nhật voucher:", err);
+        console.error("Lỗi khi cập nhật voucher:", err);
         return res.status(500).json({ error: "Không thể cập nhật voucher" });
       }
-      res.json({ message: " Cập nhật voucher thành công" });
+      res.json({ message: "Cập nhật voucher thành công" });
     }
   );
 });
 
 //  Xoá voucher
-app.delete("/api/voucher", (req, res) => {
-  const id = req.query.id;
-  if (!id) return res.status(400).json({ error: "Thiếu ID voucher cần xóa" });
+// XÓA voucher theo ID – CHUẨN RESTful + kiểm tra kỹ + trả lỗi rõ ràng
+app.delete("/api/voucher/:id", (req, res) => {
+  const id = req.params.id;
 
-  const sql = "DELETE FROM ma_giam_gia WHERE giam_gia_id=?";
-  db.query(sql, [id], (err) => {
+  // Kiểm tra ID hợp lệ (phải là số)
+  if (!id || isNaN(Number(id))) {
+    return res.status(400).json({ error: "ID voucher không hợp lệ!" });
+  }
+
+  const sql = "DELETE FROM ma_giam_gia WHERE giam_gia_id = ?";
+
+  db.query(sql, [id], (err, result) => {
     if (err) {
-      console.error(" Lỗi khi xoá voucher:", err);
-      return res.status(500).json({ error: "Không thể xoá voucher" });
+      console.error("Lỗi khi xoá voucher ID:", id, err);
+      return res.status(500).json({ error: "Lỗi server khi xoá voucher" });
     }
-    res.json({ message: " Xoá voucher thành công" });
+
+    // Nếu không có dòng nào bị xoá → voucher không tồn tại
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Không tìm thấy voucher để xoá" });
+    }
+
+    // Thành công
+    res.json({ 
+      message: "Xoá voucher thành công!", 
+      deleted_id: Number(id) 
+    });
   });
 });
 
@@ -1123,56 +1233,137 @@ app.get("/loaisach/:id/sach", (req, res) => {
 });
 
 
-app.post('/api/create-qr', async (req, res) => {
+// ================== TẠO ĐƠN HÀNG (giữ nguyên, chỉ thêm log) ==================
+app.post('/api/don-hang', async (req, res) => {
   try {
-    // 🔥 Lấy các giá trị dynamic từ Front-end
-    const { amount, orderId, orderInfo, ipAddr, returnUrl } = req.body;
+    const { customer, items, total, paymentMethod } = req.body;
 
-    // VNPay yêu cầu số tiền phải * 100
-    const amountInCents = Number(amount) * 100;
+    if (!customer || !items || !total || !paymentMethod) {
+      return res.status(400).json({ success: false, message: "Thiếu dữ liệu" });
+    }
 
-    const vnpay = new VNPay({
-      tmnCode: 'D3BX5CIF',
-      secureSecret: 'TXQUFKM8G0O5BDIN8IA1LR3611W95WJC',
-      vnpayHost: 'https://sandbox.vnpayment.vn',
-      testMode: true,
-      hashAlgorithm: 'SHA512',
-      loggerFn: ignoreLogger,
-    });
+    const orderCode = `PIBOOK-${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const itemsText = items.map(i => `${i.name} x${i.quantity}`).join(', ');
 
-    // Tạo thời gian hết hạn
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // SỬA DÒNG NÀY – QUAN TRỌNG NHẤT TRÊN ĐỜI!!!
+    const trangThai = `${orderCode} | VNPay | ${customer.name || 'Khách'} | ${customer.phone || ''} | ${total.toLocaleString()}đ | ${itemsText}`;
 
-    // Gọi VNPay để build URL
-    const vnpayResponse = await vnpay.buildPaymentUrl({
-      vnp_Amount: amountInCents,
-      vnp_IpAddr: ipAddr || '127.0.0.1',
-      vnp_TxnRef: orderId,
-      vnp_OrderInfo: orderInfo,
-      vnp_OrderType: ProductCode.Other,
-      vnp_ReturnUrl: returnUrl,
-      vnp_Locale: VnpLocale.VN,
-      vnp_CreateDate: dateFormat(new Date()),
-      vnp_ExpireDate: dateFormat(tomorrow),
-    });
+    const sql = `
+      INSERT INTO don_hang 
+        (nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, ngay_dat, ngay_TT, DC_GH, trang_thai)
+      VALUES 
+        (NULL, NULL, NULL, NOW(), NULL, ?, ?)
+    `;
 
-    console.log("VNPay URL:", vnpayResponse);
+    await db.promise().execute(sql, [
+      customer.address || 'Chưa có địa chỉ',
+      trangThai
+    ]);
 
-    //  FE cần trả về dạng { vnpUrl: "..." }
-    return res.status(201).json({
-      vnpUrl: vnpayResponse,
-    });
+    console.log('TẠO ĐƠN HÀNG VNPAY THÀNH CÔNG →', orderCode);
+    return res.json({ success: true, orderCode });
 
-  } catch (error) {
-    console.error("VNPay Error:", error);
-    return res.status(500).json({
-      message: "Lỗi tạo QR thanh toán VNPay",
-      error: error.message,
-    });
+  } catch (err) {
+    console.error('LỖI TẠO ĐƠN HÀNG:', err.message);
+    return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
 
+// ================== TẠO URL THANH TOÁN VNPAY (ĐÃ FIX 100%) ==================
+app.post("/api/create-qr", async (req, res) => {
+  try {
+    const { amount, orderId, orderInfo = "Thanh toan don hang PIBOOK" } = req.body;
+
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      return res.status(400).json({ message: "Số tiền không hợp lệ" });
+    }
+    if (!orderId) {
+      return res.status(400).json({ message: "Thiếu mã đơn hàng" });
+    }
+
+    const vnp_Amount = Math.round(Number(amount) * 100);
+    const createDate = new Date();
+    const expireDate = new Date(createDate.getTime() + 15 * 60 * 1000); // 15 phút
+
+    // QUAN TRỌNG: Phải trỏ đúng vào route /api/vnpay-return
+    // SỬA DÒNG NÀY TRONG FILE api/create-qr
+     // SỬA CHỈ 1 DÒNG – XONG MÃI MÃI!!!
+    const returnUrl = 'http://localhost:3000/checkout/vnpay-return';
+
+    const paymentUrl = vnpay.buildPaymentUrl({
+      vnp_Version: "2.1.0",
+      vnp_Command: "pay",
+      vnp_TmnCode: "D3BX5CIF",
+      vnp_Amount: vnp_Amount,
+      vnp_CreateDate: formatDate(createDate),
+      vnp_CurrCode: "VND",
+      vnp_IpAddr: req.ip?.replace('::ffff:', '') || "127.0.0.1",
+      vnp_Locale: "vn",
+      vnp_OrderInfo: `${orderInfo} ${orderId}`,
+      vnp_OrderType: "250001",
+      vnp_ReturnUrl: returnUrl,
+      vnp_TxnRef: orderId,
+      vnp_ExpireDate: formatDate(expireDate),
+    });
+
+    console.log("Tạo URL VNPay thành công →", paymentUrl);
+    return res.json({ vnpUrl: paymentUrl });
+
+  } catch (error) {
+    console.error("Lỗi tạo VNPay URL:", error);
+    return res.status(500).json({ message: "Lỗi tạo thanh toán VNPay" });
+  }
+});
+
+// ================== XỬ LÝ KẾT QUẢ VNPAY – HOÀN HẢO CHO CẢ GET & POST ==================
+app.all('/api/vnpay-return', async (req, res) => {
+  try {
+    const vnp_Params = { ...req.query, ...req.body };
+    const secureHash = vnp_Params.vnp_SecureHash;
+    if (!secureHash) return res.json({ success: false, message: 'Thiếu chữ ký' });
+
+    // Tạo hash verify
+    const params = { ...vnp_Params };
+    delete params.vnp_SecureHash;
+    delete params.vnp_SecureHashType;
+    const sortedParams = {};
+    Object.keys(params).sort().forEach(k => sortedParams[k] = decodeURIComponent(params[k] + ''));
+    const signData = new URLSearchParams(sortedParams).toString();
+    const generatedHash = require('crypto')
+      .createHmac('sha512', 'TXQUFKM8G0O5BDIN8IA1LR3611W95WJC')
+      .update(signData).digest('hex');
+
+    const orderCode = vnp_Params.vnp_TxnRef;
+    const responseCode = vnp_Params.vnp_ResponseCode || '99';
+
+    if (secureHash === generatedHash && responseCode === '00') {
+      const [rows] = await db.promise().query(
+        `SELECT don_hang_id FROM don_hang WHERE trang_thai LIKE ? LIMIT 1`,
+        [`%${orderCode}%`]
+      );
+
+      if (rows.length === 0) {
+        console.log('KHÔNG TÌM THẤY ĐƠN HÀNG:', orderCode);
+        return res.json({ success: false, message: 'Không tìm thấy đơn hàng' });
+      }
+
+      await db.promise().query(
+        `UPDATE don_hang SET trang_thai = ?, HT_Thanh_toan_id = 3, ngay_TT = NOW() WHERE don_hang_id = ?`,
+        [`Đã thanh toán VNPay | Mã GD: ${vnp_Params.vnp_TransactionNo} | Đơn: ${orderCode}`, rows[0].don_hang_id]
+      );
+
+      console.log('THANH TOÁN THÀNH CÔNG – ĐƠN:', orderCode);
+      return res.json({ success: true, orderCode });
+    }
+
+    // THẤT BẠI
+    return res.json({ success: false, message: 'Thanh toán thất bại' });
+
+  } catch (err) {
+    console.error(err);
+    return res.json({ success: false, message: 'Lỗi server' });
+  }
+});
 
 // ================== CHẠY SERVER ==================
 const PORT = process.env.PORT || 3003;

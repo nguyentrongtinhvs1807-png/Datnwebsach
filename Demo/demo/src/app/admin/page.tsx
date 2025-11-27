@@ -6,7 +6,9 @@ import AdminProduct from "@/components/admin.product";
 import Sidebar from "@/components/sidebar";
 import VoucherManager from "@/components/voucher.manager";
 import OrdersPage from "@/app/admin/orders/page"; 
-import AdminDanhMucPage from "@/app/admin/danhmuc/page"; // ✅ Gọi đúng trang quản lý danh mục
+import AdminDanhMucPage from "@/app/admin/danhmuc/page"; 
+import CommentPage from "./comments/page";
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,7 +36,7 @@ function UserManager() {
       .catch(() => setUsers([]));
   }, []);
 
-  // 🔹 Ẩn người dùng (PATCH)
+  //  Ẩn người dùng (PATCH)
   const hideUser = async (id: number) => {
     if (!confirm("👻 Bạn có chắc muốn ẨN người dùng này (không xoá dữ liệu)?")) return;
 
@@ -60,7 +62,7 @@ function UserManager() {
     }
   };
 
-  // 🔹 Hiện lại người dùng (PATCH)
+  //  Hiện lại người dùng (PATCH)
   const unhideUser = async (id: number) => {
     try {
       const res = await fetch(`http://localhost:3003/users/${id}/unhide`, {
@@ -445,10 +447,10 @@ export default function AdminPage() {
               <AdminProduct />
             </>
           )}
-          {activeTab === "comments" && (
+            {activeTab === "comments" && (
             <>
-              <h4 className="fw-bold text-primary mb-3">Quản lý bình luận</h4>
-              <CommentManager />
+             <h4 className="fw-bold text-primary mb-3">Quản lý bình luận</h4>
+             <CommentPage />
             </>
           )}
           {activeTab === "users" && (

@@ -275,9 +275,7 @@ export default function ProductList() {
                 <div className="card border-0 shadow-lg position-relative product-card d-flex flex-column w-100" style={{ borderRadius: "22px", minHeight: "520px", background: "linear-gradient(120deg,#fffbe8 80%,#fff6e9 100%)", overflow: "visible", transition: "transform 0.24s cubic-bezier(.2,.68,.37,.98), box-shadow 0.22s" }}>
                   
                   {/* Ưu đãi */}
-                  {b.gg_sach > 0 && (
-                    <div style={{ position: "absolute", top: "16px", left: "-25px", background: "linear-gradient(90deg, #f79c43, #f1c40f)", color: "white", fontWeight: 700, fontSize: "0.85rem", padding: "4px 40px", transform: "rotate(-23deg)", boxShadow: "0 4px 18px #f1c40f70", zIndex: 2 }}>ƯU ĐÃI</div>
-                  )}
+                  
 
                   {/* Hình ảnh (ĐÃ BIẾN THÀNH THẺ <a> HTML) */}
                   <a href={`/products/${b.sach_id}`} style={{ 

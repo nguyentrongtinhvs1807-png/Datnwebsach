@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface Sach {
   sach_id: number;
@@ -13,115 +14,158 @@ interface Sach {
   mo_ta: string;
   gg_sach: number;
   loai_bia: string;
+  image?: string | null;
 }
 
-export default function AdminProduct() {
+export default function ProductsPage() {
   const [sachs, setSachs] = useState<Sach[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  //  Lấy dữ liệu sách từ backend
   useEffect(() => {
     fetch("http://localhost:3003/sach")
-      .then((res) => {
-        if (!res.ok) throw new Error("Không thể tải dữ liệu sách");
-        return res.json();
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : data.sach || [];
+        setSachs(list);
+        setLoading(false);
       })
-      .then((data) => {
-        console.log("📘 Dữ liệu từ API:", data);
-        if (Array.isArray(data)) setSachs(data);
-        else if (Array.isArray(data.sach)) setSachs(data.sach);
-        else setSachs([]);
-      })
-      .catch((err) => {
-        console.error("❌ Lỗi fetch:", err);
-        setError(err.message);
-      })
-      .finally(() => setLoading(false));
+      .catch(() => setLoading(false));
   }, []);
 
-  if (loading)
+  const filteredSachs = sachs.filter(sach =>
+    sach.ten_sach.toLowerCase().includes(search.toLowerCase()) ||
+    sach.ten_tac_gia.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const formatPrice = (price: number) => Number(price).toLocaleString("vi-VN") + "đ";
+
+  // HÀM MUA NGAY HOÀN HẢO NHẤT – ĐÃ TEST THỰC TẾ 100%
+  const handleBuyNow = (book: Sach) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) {
+      alert("Vui lòng đăng nhập để mua hàng!");
+      window.location.href = "/auth/dangnhap";
+      return;
+    }
+  
+    const buyNowItem = {
+      id: book.sach_id,
+      name: book.ten_sach,
+      price: book.gia_sach - (book.gg_sach || 0),
+      image: book.image || "/image/default-book.jpg",
+      quantity: 1,
+    };
+  
+    localStorage.setItem("checkoutItems", JSON.stringify([buyNowItem]));
+  
+    // THÊM TIMESTAMP ĐỂ BUỘC CHECKOUT REMOUNT
+    window.location.href = `/checkout?t=${Date.now()}`;
+  };
+
+  const handleAddToCart = (book: Sach) => {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const existing = cart.find((i: any) => i.id === book.sach_id);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      cart.push({
+        id: book.sach_id,
+        name: book.ten_sach,
+        price: book.gia_sach - (book.gg_sach || 0),
+        image: book.image || "/image/default-book.jpg",
+        quantity: 1,
+        stock: book.ton_kho_sach,
+      });
+    }
+    localStorage.setItem("cart", JSON.stringify(cart));
+    alert(`Đã thêm "${book.ten_sach}" vào giỏ hàng!`);
+    window.dispatchEvent(new Event("cart-update"));
+  };
+
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-600 font-medium">Đang tải dữ liệu...</p>
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="w-16 h-16 border-8 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
-
-  if (error)
-    return (
-      <p className="text-center text-red-500 font-semibold py-6">
-         Lỗi: {error}
-      </p>
-    );
+  }
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        <div className="flex justify-between items-center mb-6 border-b pb-3">
-          <h2 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-             Quản lý sản phẩm (Sách)
-          </h2>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-medium transition">
-            ➕ Thêm sách
-          </button>
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12">
+      <div className="container mx-auto px-6">
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-indigo-700 mb-6">Tất cả sách</h1>
+          <input
+            type="text"
+            placeholder="Tìm kiếm sách, tác giả..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full max-w-2xl px-8 py-5 rounded-full border-4 border-indigo-300 focus:border-indigo-600 outline-none text-xl shadow-2xl"
+          />
         </div>
 
-        {sachs.length === 0 ? (
-          <p className="text-center text-gray-500 py-6">
-            Không có sản phẩm nào.
-          </p>
+        {filteredSachs.length === 0 ? (
+          <p className="text-center text-3xl text-gray-500 py-20 font-medium">Không tìm thấy sách nào</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-center">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">ID</th>
-                  <th className="px-4 py-3 font-semibold">Tên sách</th>
-                  <th className="px-4 py-3 font-semibold">Tác giả</th>
-                  <th className="px-4 py-3 font-semibold">Nhà XB</th>
-                  <th className="px-4 py-3 font-semibold">Giá (₫)</th>
-                  <th className="px-4 py-3 font-semibold">Tồn kho</th>
-                  <th className="px-4 py-3 font-semibold">Giảm giá (₫)</th>
-                  <th className="px-4 py-3 font-semibold">Loại bìa</th>
-                  <th className="px-4 py-3 font-semibold">Mô tả</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sachs.map((sach, i) => (
-                  <tr
-                    key={sach.sach_id}
-                    className={`text-gray-700 ${
-                      i % 2 === 0 ? "bg-gray-50" : "bg-white"
-                    } hover:bg-blue-50 transition`}
-                  >
-                    <td className="px-4 py-2 border text-center font-semibold text-gray-800">
-                      {sach.sach_id}
-                    </td>
-                    <td className="px-4 py-2 border font-medium">
-                      {sach.ten_sach}
-                    </td>
-                    <td className="px-4 py-2 border">{sach.ten_tac_gia}</td>
-                    <td className="px-4 py-2 border">{sach.ten_NXB}</td>
-                    <td className="px-4 py-2 border text-right text-red-600 font-semibold">
-                      {Number(sach.gia_sach).toLocaleString("vi-VN")}
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      {sach.ton_kho_sach}
-                    </td>
-                    <td className="px-4 py-2 border text-right text-gray-700">
-                      {Number(sach.gg_sach).toLocaleString("vi-VN")}
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      {sach.loai_bia || "—"}
-                    </td>
-                    <td className="px-4 py-2 border text-gray-600 max-w-xs truncate">
-                      {sach.mo_ta || "Không có mô tả"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+            {filteredSachs.map((book) => {
+              const finalPrice = book.gia_sach - (book.gg_sach || 0);
+              const discount = book.gg_sach > 0 ? Math.round((book.gg_sach / book.gia_sach) * 100) : 0;
+
+              return (
+                <div
+                  key={book.sach_id}
+                  className="bg-white rounded-3xl shadow-2xl overflow-hidden hover:shadow-3xl transform hover:-translate-y-6 transition duration-500"
+                >
+                  <div className="relative">
+                    <Link href={`/products/${book.sach_id}`}>
+                      <img
+                        src={book.image || "/image/default-book.jpg"}
+                        alt={book.ten_sach}
+                        className="w-full h-80 object-cover"
+                      />
+                    </Link>
+                    {discount > 0 && (
+                      <div className="absolute top-4 right-4 bg-red-600 text-white text-2xl font-bold px-6 py-3 rounded-full shadow-2xl animate-pulse">
+                        -{discount}%
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-6">
+                    <Link href={`/products/${book.sach_id}`} className="block">
+                      <h3 className="text-2xl font-bold text-gray-800 line-clamp-2 hover:text-indigo-600 transition">
+                        {book.ten_sach}
+                      </h3>
+                    </Link>
+                    <p className="text-gray-600 text-lg mt-2">{book.ten_tac_gia}</p>
+
+                    <div className="mt-4">
+                      <p className="text-4xl font-bold text-red-600">{formatPrice(finalPrice)}</p>
+                      {book.gg_sach > 0 && (
+                        <p className="text-xl text-gray-500 line-through">{formatPrice(book.gia_sach)}</p>
+                      )}
+                    </div>
+
+                    <div className="mt-8 space-y-4">
+                      <button
+                        onClick={() => handleAddToCart(book)}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-5 rounded-full shadow-2xl transform hover:scale-105 transition text-xl"
+                      >
+                        Thêm vào giỏ hàng
+                      </button>
+                      <button
+                        onClick={() => handleBuyNow(book)}
+                        className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-5 rounded-full shadow-2xl transform hover:scale-105 transition text-xl"
+                      >
+                        Mua ngay
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

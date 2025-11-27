@@ -33,6 +33,7 @@ interface Book {
 interface Category {
   loai_sach_id: number;
   ten_loai: string;
+  hinh_anh?: string;
 }
 interface Discount {
   ma_gg: string;
@@ -220,42 +221,52 @@ export default function Home() {
   };
 
   // handleBuyNow
-  const handleBuyNow = (book: Book) => {
-    const storedUser = localStorage.getItem("user");
-    if (!storedUser) {
-      showNotification("⚠️ Vui lòng đăng nhập để tiếp tục mua hàng!", 'warning');
+  // handleBuyNow – PHIÊN BẢN HOÀN HẢO NHẤT, DÙNG CHUNG VỚI TRANG CHI TIẾT
+const handleBuyNow = (book: Book) => {
+  // 1. Kiểm tra đăng nhập
+  const storedUser = localStorage.getItem("user");
+  if (!storedUser) {
+    showNotification("Vui lòng đăng nhập để mua hàng!", 'warning');
+    router.push("/auth/dangnhap");
+    return;
+  }
+
+  try {
+    const user = JSON.parse(storedUser);
+    if (!user?.id) {
+      showNotification("Phiên đăng nhập không hợp lệ!", 'warning');
       router.push("/auth/dangnhap");
       return;
     }
-  
-    try {
-      const user = JSON.parse(storedUser);
-      if (!user || (!user.id && !user.ten && !user.email)) {
-        showNotification("⚠️ Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại!", 'warning');
-        router.push("/auth/dangnhap");
-        return;
-      }
-  
-      //  Lưu sản phẩm được mua ngay vào localStorage riêng
-      const quickBuy = [
-        {
-          sach_id: book.sach_id,
-          ten_sach: book.ten_sach,
-          price: book.gia_sach - (book.gg_sach || 0),
-          image: book.image,
-          quantity: 1,
-          ten_tac_gia: book.ten_tac_gia,
-        },
-      ];
-      localStorage.setItem("checkoutItem", JSON.stringify(quickBuy));
-  
-      //  Chuyển sang trang thanh toán
-      router.push("/checkout");
-    } catch (error) {
-      console.error("❌ Lỗi khi xử lý mua ngay:", error);
-      showNotification("⚠️ Đã có lỗi xảy ra, vui lòng thử lại!", 'danger');
-    }
-  };
+
+    // 2. Tạo item mua ngay – giống hệt trang chi tiết
+    const selectedItem = {
+      id: book.sach_id,
+      name: book.ten_sach,
+      price: book.gia_sach - (book.gg_sach || 0),
+      image: book.image || "/image/default-book.jpg",
+      quantity: 1,
+      stock: book.ton_kho_sach, // thêm stock để checkout kiểm tra
+    };
+
+    // 3. LƯU DƯỚI DẠNG MẢNG – DÙNG CHUNG VỚI GIỎ HÀNG
+    localStorage.setItem("checkoutItems", JSON.stringify([selectedItem]));
+
+    // 4. XÓA KEY CŨ ĐỂ TRÁNH NHẦM LẪN
+    localStorage.removeItem("checkoutItem");
+    localStorage.removeItem("cartItem");
+
+    // 5. CHUYỂN HƯỚNG MƯỢT MÀ
+    router.push("/checkout");
+
+    // 6. THÔNG BÁO THÀNH CÔNG
+    showNotification(`Đã chọn "${book.ten_sach}" để mua ngay!`, 'success');
+
+  } catch (error) {
+    console.error("Lỗi mua ngay:", error);
+    showNotification("Có lỗi xảy ra, vui lòng thử lại!", 'danger');
+  }
+};
   
 
   // Helper: format discount for UI - format số nguyên không có .00
@@ -334,103 +345,72 @@ export default function Home() {
         onClose={closeNotification} 
       />
 
-      {/* ======== HEADER & SEARCH ======== */}
-      <Container
+      {/* ======== HEADER HIỆN ĐẠI – TỐI GIẢN ======== */}
+<Container
   fluid
-  className="py-2 px-lg-5 px-md-3 hero-bg"
+  className="py-5 px-lg-5 px-md-4 hero-bg"
   style={{
-    background: "linear-gradient(90deg, #ffd976 0%, #ffeacb 100%)",
-    borderRadius: "24px",
-    marginTop: "24px",
-    boxShadow: "0 8px 36px rgba(255,193,7,0.18)"
+    background: "linear-gradient(100deg, #ffebb8 0%, #ffe4c4 100%)",
+    borderRadius: "32px",
+    marginTop: "32px",
+    boxShadow: "0 12px 45px rgba(255,183,3,0.18)"
   }}
 >
   <Row className="align-items-center">
-    {/* Cột bên trái */}
+    
+    {/* ====== Cột trái ====== */}
     <Col xs={12} md={6} className="mb-4 mb-md-0">
       <h1
-        className="display-4 fw-bold mb-3"
-        style={{ color: "#222" }}
+        className="fw-bold mb-3"
+        style={{
+          color: "#1f1f1f",
+          fontSize: "2.6rem",
+          lineHeight: "1.2"
+        }}
       >
-        Chào mừng bạn đến với{" "}
-        <span style={{ color: "#d97706" }}>Pibbok</span>
+        Chào mừng đến <br />
+        với <span style={{ color: "#d97706" }}>Pibbok</span>
       </h1>
-      <p className="lead" style={{ color: "#565656" }}>
-        Nền tảng mua sách trực tuyến thông minh. Tìm kiếm, chọn lựa
-        và tận hưởng sách mỗi ngày!
+
+      <p
+        className="mt-3"
+        style={{
+          color: "#5c5c5c",
+          fontSize: "1.1rem",
+          maxWidth: "450px",
+          lineHeight: "1.6"
+        }}
+      >
+        Nơi bạn có thể khám phá những cuốn sách hay nhất
+        và tạo nên hành trình đọc thú vị mỗi ngày.
       </p>
-
-      <InputGroup className="my-4 w-75" style={{ maxWidth: 400 }}>
-        <FormControl
-          placeholder="Tìm tên sách, tác giả, ..."
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          style={{
-            borderTopLeftRadius: "24px",
-            borderBottomLeftRadius: "24px",
-            borderRight: "none",
-            fontSize: 16,
-            boxShadow: "0 2px 8px 0 rgba(255,193,7,0.07)"
-          }}
-        />
-        <Button
-          variant="warning"
-          style={{
-            borderTopRightRadius: "24px",
-            borderBottomRightRadius: "24px",
-            fontWeight: 600
-          }}
-        >
-          Tìm kiếm
-        </Button>
-      </InputGroup>
-
-      {/* Danh sách thể loại */}
-      <div className="d-flex flex-wrap gap-2 mt-2">
-        {categories.slice(0, 8).map((c) => (
-          <Badge
-            key={c.loai_sach_id}
-            bg="light"
-            text="dark"
-            style={{
-              border: "1px solid #ffd346",
-              borderRadius: 20,
-              padding: "8px 16px",
-              cursor: "pointer",
-              fontWeight: 500,
-              background: "linear-gradient(90deg, #fffde4, #fff6ba)"
-            }}
-            onClick={() => router.push(`/category/${c.loai_sach_id}`)}
-          >
-            {c.ten_loai}
-          </Badge>
-        ))}
-      </div>
     </Col>
 
-    {/* Cột bên phải (ảnh banner) */}
+    {/* ====== Cột phải (Banner) ====== */}
     <Col xs={12} md={6}>
       <div
-        className="position-relative hero-banner mx-auto overflow-hidden shadow-sm"
+        className="position-relative hero-banner mx-auto overflow-hidden"
         style={{
-          maxWidth: "440px",
-          borderRadius: "2rem",
-          border: "2px solid #ffe8b3",
-          transition: "transform 0.4s ease, box-shadow 0.4s ease"
+          maxWidth: "470px",
+          borderRadius: "2.4rem",
+          border: "2px solid #ffe0a8",
+          boxShadow: "0 8px 28px rgba(0,0,0,0.1)",
+          transition: "transform 0.35s ease, box-shadow 0.35s ease"
         }}
       >
         <img
-          src="/image/images (11).jpeg" 
+          src="/image/images (11).jpeg"
           alt="Pibook Banner"
           style={{
             width: "100%",
-            height: "250px",
+            height: "270px",
             objectFit: "cover",
-            borderRadius: "2rem"
+            borderRadius: "2.4rem"
           }}
           onMouseOver={(e) => {
-            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.03)";
-            (e.currentTarget as HTMLImageElement).style.boxShadow = "0 12px 30px rgba(0,0,0,0.1)";
+            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.04)";
+            (e.currentTarget as HTMLImageElement).style.boxShadow =
+              "0 18px 40px rgba(0,0,0,0.15)";
           }}
           onMouseOut={(e) => {
             (e.currentTarget as HTMLImageElement).style.transform = "scale(1)";
@@ -439,8 +419,10 @@ export default function Home() {
         />
       </div>
     </Col>
+
   </Row>
 </Container>
+
       {/* ======= DANH MỤC & BANNER ======= */}
       <Container className="my-5">
         <Row className="gx-4">
@@ -551,85 +533,137 @@ export default function Home() {
         </Row>
         
       </Container>
- {/* ========= DANH MỤC SÁCH (UI MỚI – KHÔNG ICON) ========= */}
-<Container className="mb-5">
-  <h2
-    className="fw-bold text-center mb-5"
-    style={{
-      color: "#ff9800",
-      fontSize: "2.2rem",
-      letterSpacing: "1px",
-      textTransform: "uppercase",
-    }}
-  >
-    Danh mục sách
-    <div
+{/* ========= DANH MỤC SÁCH – MỖI LOẠI MỘT ẢNH RIÊNG ========= */}
+<Container className="my-5">
+  <div className="text-center mb-5">
+    <h2
+      className="fw-bold d-inline-block position-relative"
       style={{
-        width: 80,
-        height: 4,
-        background: "#ff9800",
-        margin: "10px auto 0",
+        color: "#d97706",
+        fontSize: "2.4rem",
+        letterSpacing: "1px",
+        textTransform: "uppercase",
+      }}
+    >
+      Danh mục sách
+    </h2>
+    <div
+      className="mx-auto mt-3"
+      style={{
+        width: 100,
+        height: 5,
+        background: "linear-gradient(90deg, #ff9800, #f97316)",
         borderRadius: 10,
       }}
-    ></div>
-  </h2>
+    />
+  </div>
 
   {categories.length > 0 ? (
-    <Row className="justify-content-center g-4">
-      {categories.map((cat) => (
-        <Col key={cat.loai_sach_id} xs={6} sm={4} md={3} lg={2} className="d-flex">
-          <div
-            onClick={() => router.push(`/category/${cat.loai_sach_id}`)}
-            className="shadow-sm w-100 d-flex flex-column align-items-center rounded-4"
-            style={{
-              cursor: "pointer",
-              padding: "14px 10px",
-              background: "linear-gradient(145deg, #fff 0%, #fffdf5 100%)",
-              border: "2px solid #ffeab5",
-              transition: "all .28s ease",
-            }}
-            onMouseOver={(e) => {
-              (e.currentTarget as HTMLElement).style.transform = "translateY(-6px)";
-              (e.currentTarget as HTMLElement).style.boxShadow = "0 18px 32px rgba(255,193,7,0.3)";
-              (e.currentTarget as HTMLElement).style.borderColor = "#ffc107";
-            }}
-            onMouseOut={(e) => {
-              (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-              (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 14px rgba(0,0,0,0.08)";
-              (e.currentTarget as HTMLElement).style.borderColor = "#ffeab5";
-            }}
-          >
-            {/* ẢNH DANH MỤC */}
-            <img
-              src="https://nld.mediacdn.vn/2016/14-sach-sai-gon-pho-nha-tho-1479995951128.jpg"
-              alt={cat.ten_loai}
-              style={{
-                width: "100%",
-                height: 110,
-                objectFit: "cover",
-                borderRadius: "14px",
-                marginBottom: 12,
-                border: "1.5px solid #ffe2a8",
-              }}
-            />
+    <Row className="justify-content-center g-4 g-lg-5">
+      {categories.map((cat) => {
+        // Ảnh mặc định đẹp cho từng loại (nếu backend chưa có ảnh riêng)
+        const defaultImages: Record<string, string> = {
+          "Văn học Việt Nam": "https://minhkhai.com.vn/hinhlon/134598.jpg",
+          "Văn học nước ngoài": "https://vietbooks.info/attachments/upload_2021-10-21_23-11-1-png.2973",
+          "Kỹ năng sống": "https://www.nxbtre.com.vn/Images/Book/nxbtre_full_12252023_032502.jpg",
+          "Thiếu nhi": "https://www.nxbtre.com.vn/Images/Book/nxbtre_full_08032023_110309.jpg",
+          "Truyện tranh": "https://product.hstatic.net/200000017360/product/my_chau_trong_thuy_bia_1_64fa291e8fc147f5869895d139169040_master.png",
 
-            <span
-              className="fw-semibold text-dark text-center"
-              style={{ fontSize: "1.08rem", lineHeight: "1.3" }}
+        };
+
+        // Ưu tiên ảnh từ backend → nếu không có thì lấy ảnh mặc định theo tên loại
+        const categoryImage =
+          cat.hinh_anh && cat.hinh_anh !== ""
+            ? cat.hinh_anh
+            : defaultImages[cat.ten_loai] ||
+              "https://images.unsplash.com/photo-1491841573335-63f8c3e453ce?w=800&q=80&fit=crop"; // fallback cuối cùng
+
+        return (
+          <Col key={cat.loai_sach_id} xs={6} sm={4} md={3} lg={2}>
+            <div
+              role="button"
+              onClick={() => router.push(`/category/${cat.loai_sach_id}`)}
+              className="h-100 d-flex flex-column overflow-hidden rounded-4 shadow-sm bg-white position-relative"
+              style={{
+                cursor: "pointer",
+                border: "3px solid transparent",
+                transition: "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                background: "linear-gradient(white, white) padding-box, linear-gradient(135deg, #ffd700, #ff8c00) border-box",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-12px) scale(1.05)";
+                e.currentTarget.style.boxShadow = "0 20px 40px rgba(255, 152, 0, 0.3)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0) scale(1)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.1)";
+              }}
             >
-              {cat.ten_loai}
-            </span>
-          </div>
-        </Col>
-      ))}
+              {/* Ảnh danh mục */}
+              <div className="position-relative overflow-hidden" style={{ height: 140 }}>
+                <img
+                  src={categoryImage}
+                  alt={cat.ten_loai}
+                  className="w-100 h-100"
+                  style={{
+                    objectFit: "cover",
+                    transition: "transform 0.5s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.12)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                />
+                {/* Overlay nhẹ khi hover */}
+                <div
+                  className="position-absolute inset-0 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(transparent, rgba(0,0,0,0.15))",
+                    opacity: 0,
+                    transition: "opacity 0.3s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "0")}
+                />
+              </div>
+
+              {/* Tên danh mục */}
+              <div className="p-3 text-center flex-grow-1 d-flex align-items-center justify-content-center">
+                <span
+                  className="fw-bold text-dark"
+                  style={{
+                    fontSize: "1.05rem",
+                    lineHeight: "1.4",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  {cat.ten_loai}
+                </span>
+              </div>
+
+              {/* Hiệu ứng viền vàng khi hover */}
+              <div
+                className="position-absolute inset-0 rounded-4 pointer-events-none"
+                style={{
+                  border: "3px solid #ffd700",
+                  opacity: 0,
+                  transition: "opacity 0.3s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = "0")}
+              />
+            </div>
+          </Col>
+        );
+      })}
     </Row>
   ) : (
-    <p className="text-center text-muted">Không có danh mục nào để hiển thị.</p>
+    <div className="text-center py-5">
+      <p className="text-muted fs-5">Đang tải danh mục sách...</p>
+    </div>
   )}
 </Container>
 
-      {/* ========= MÃ GIẢM GIÁ nổi bật - HIỂN THỊ RÕ RÀNG ========= */}
-      <Container className="my-5" style={{ 
+  {/* ========= MÃ GIẢM GIÁ nổi bật - HIỂN THỊ RÕ RÀNG ========= */}
+  <Container className="my-5" style={{ 
         background: "linear-gradient(135deg, #fff9e6 0%, #ffe8b3 100%)",
         borderRadius: "24px",
         padding: "32px 24px",
@@ -819,7 +853,7 @@ export default function Home() {
             </div>
           </div>
         )}
-      </Container>
+</Container>
 
 {/* ========= SÁCH MỚI & SÁCH GIẢM GIÁ ======== */}
   <Container className="mt-5 mb-5">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, Button, Modal, Form, Image, Row, Col, InputGroup } from "react-bootstrap";
+import { Table, Button, Modal, Form, Image, InputGroup } from "react-bootstrap";
 
 interface LoaiSach {
   loai_sach_id?: number;
@@ -32,7 +32,6 @@ export default function AdminLoaiSachPage() {
 
   const API_URL = "http://localhost:3003";
 
-  // 🟢 Lấy danh sách loại sách
   const fetchLoaiSach = async () => {
     try {
       const res = await fetch(`${API_URL}/loaisach`);
@@ -40,7 +39,7 @@ export default function AdminLoaiSachPage() {
       const data = await res.json();
       setLoaiSach(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("❌ Lỗi khi tải loại sách:", err);
+      console.error("Lỗi khi tải loại sách:", err);
     }
   };
 
@@ -48,7 +47,6 @@ export default function AdminLoaiSachPage() {
     fetchLoaiSach();
   }, []);
 
-  // 🟡 Mở modal thêm / sửa
   const handleShow = (item?: LoaiSach) => {
     if (item) {
       setEditing(item);
@@ -60,10 +58,9 @@ export default function AdminLoaiSachPage() {
     setShowModal(true);
   };
 
-  // 🧩 Lưu loại sách (Thêm hoặc Sửa)
   const handleSave = async () => {
     if (!form.ten_loai.trim()) {
-      alert("⚠️ Vui lòng nhập tên loại sách!");
+      alert("Vui lòng nhập tên loại sách!");
       return;
     }
 
@@ -81,33 +78,30 @@ export default function AdminLoaiSachPage() {
 
       if (!res.ok) throw new Error("Không thể lưu loại sách");
 
-      alert(editing ? "✅ Cập nhật thành công!" : "✅ Thêm mới thành công!");
+      alert(editing ? "Cập nhật thành công!" : "Thêm mới thành công!");
       setShowModal(false);
       fetchLoaiSach();
     } catch (err) {
-      console.error("❌ Lỗi khi lưu loại sách:", err);
-      alert("❌ Có lỗi xảy ra khi lưu loại sách!");
+      console.error("Lỗi khi lưu loại sách:", err);
+      alert("Có lỗi xảy ra khi lưu loại sách!");
     }
   };
 
-  //  Xóa loại sách
   const handleDelete = async (id?: number) => {
-    if (!id) return;
-    if (!confirm("Bạn có chắc muốn xóa loại sách này không?")) return;
+    if (!id || !confirm("Bạn có chắc muốn xóa loại sách này không?")) return;
 
     try {
       const res = await fetch(`${API_URL}/loaisach/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Không thể xóa loại sách");
 
-      alert("🗑️ Xóa thành công!");
+      alert("Xóa thành công!");
       fetchLoaiSach();
     } catch (err) {
-      console.error("❌ Lỗi khi xóa loại sách:", err);
-      alert("❌ Không thể xóa loại sách!");
+      console.error("Lỗi khi xóa loại sách:", err);
+      alert("Không thể xóa loại sách!");
     }
   };
 
-  // 📚 Xem danh sách sách thuộc loại
   const handleViewBooks = async (loai: LoaiSach) => {
     setSelectedLoai(loai);
     setShowBooksModal(true);
@@ -117,16 +111,14 @@ export default function AdminLoaiSachPage() {
       const data = await res.json();
       setBooks(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("❌ Lỗi khi tải sách:", err);
+      console.error("Lỗi khi tải sách:", err);
       setBooks([]);
     }
   };
 
-  // 💰 Hàm định dạng giá
   const formatPrice = (price: number) =>
     price?.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + " ₫";
 
-  // Lọc & sắp xếp loại sách
   const filteredLoaiSach = loaisach
     .filter((ls) =>
       ls.ten_loai.toLowerCase().includes(search.trim().toLowerCase())
@@ -150,7 +142,6 @@ export default function AdminLoaiSachPage() {
       >
         <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3 gap-3">
           <h2 className="fw-bold mb-0" style={{ color: "#2154C5" }}>
-            <i className="bi bi-collection me-2"></i>
             Quản lý Danh Mục Loại Sách
           </h2>
           <div className="d-flex flex-wrap align-items-center gap-2 mt-3 mt-md-0">
@@ -169,7 +160,7 @@ export default function AdminLoaiSachPage() {
                 }}
               />
               <Button variant="outline-secondary" style={{ borderWidth: "2px" }}>
-                <i className="bi bi-search"></i>
+                Search
               </Button>
             </InputGroup>
             <Button
@@ -178,12 +169,12 @@ export default function AdminLoaiSachPage() {
               style={{ borderRadius: "8px" }}
               onClick={() => handleShow()}
             >
-              <i className="bi bi-plus-circle me-1"></i>Thêm loại sách
+              Thêm loại sách
             </Button>
           </div>
         </div>
 
-        <div className="table-responsive shadow-sm rounded-3 overflow-hidden my-2 px-0">
+        <div className="table-responsive shadow-sm rounded-3 overflow-hidden my-2">
           <Table hover borderless className="align-middle mb-0">
             <thead
               style={{
@@ -200,11 +191,9 @@ export default function AdminLoaiSachPage() {
                   onClick={() => setSortAsc((v) => !v)}
                 >
                   Tên loại sách{" "}
-                  <i
-                    className={`bi bi-sort-alpha-${sortAsc ? "down" : "up"}-alt ms-1`}
-                  ></i>
+                  <i className={`bi bi-sort-alpha-${sortAsc ? "down" : "up"}-alt ms-1`}></i>
                 </th>
-                <th style={{ width: "260px", fontWeight: 600 }}>Hành động</th>
+                <th style={{ width: "380px", fontWeight: 600 }}>Hành động</th>
               </tr>
             </thead>
             <tbody>
@@ -223,42 +212,94 @@ export default function AdminLoaiSachPage() {
                     <td className="fw-bold" style={{ fontSize: "1.08rem" }}>
                       {ls.ten_loai}
                     </td>
-                    <td className="text-center">
-                      <Button
-                        variant="outline-info"
-                        size="sm"
-                        className="me-2 fw-semibold"
-                        style={{ borderRadius: "6px", minWidth: 90 }}
-                        onClick={() => handleViewBooks(ls)}
-                      >
-                        <i className="bi bi-book-half me-1"></i>
-                        Xem sách
-                      </Button>
-                      <Button
-                        variant="outline-warning"
-                        size="sm"
-                        className="me-2 fw-semibold"
-                        style={{ borderRadius: "6px", minWidth: 70, color: "#754C00" }}
-                        onClick={() => handleShow(ls)}
-                      >
-                        <i className="bi bi-pencil-square me-1"></i>Sửa
-                      </Button>
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        className="fw-semibold"
-                        style={{ borderRadius: "6px", minWidth: 70 }}
-                        onClick={() => handleDelete(ls.loai_sach_id)}
-                      >
-                        <i className="bi bi-trash3 me-1"></i>Xóa
-                      </Button>
+
+                    {/* 3 NÚT NGANG HÀNG ĐẸP TUYỆT ĐỐI */}
+                    <td className="text-center py-4">
+                      <div className="d-flex justify-content-center align-items-center gap-4">
+
+                        {/* XEM SÁCH */}
+                        <button
+                          onClick={() => handleViewBooks(ls)}
+                          className="btn btn-outline-info d-flex align-items-center gap-2 fw-bold shadow-sm border-2"
+                          style={{
+                            borderRadius: "16px",
+                            padding: "10px 20px",
+                            minWidth: "130px",
+                            fontSize: "1rem",
+                            transition: "all 0.3s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#d1ecf1";
+                            e.currentTarget.style.transform = "translateY(-3px)";
+                            e.currentTarget.style.boxShadow = "0 8px 20px rgba(13,110,199,0.25)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "";
+                            e.currentTarget.style.transform = "";
+                            e.currentTarget.style.boxShadow = "";
+                          }}
+                        >
+                          Xem sách
+                        </button>
+
+                        {/* SỬA */}
+                        <button
+                          onClick={() => handleShow(ls)}
+                          className="btn btn-outline-warning d-flex align-items-center gap-2 fw-bold shadow-sm border-2"
+                          style={{
+                            borderRadius: "16px",
+                            padding: "10px 20px",
+                            minWidth: "110px",
+                            fontSize: "1rem",
+                            transition: "all 0.3s ease",
+                            color: "#a06b00",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#fff3cd";
+                            e.currentTarget.style.transform = "translateY(-3px)";
+                            e.currentTarget.style.boxShadow = "0 8px 20px rgba(255,193,7,0.3)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "";
+                            e.currentTarget.style.transform = "";
+                            e.currentTarget.style.boxShadow = "";
+                          }}
+                        >
+                          Sửa
+                        </button>
+
+                        {/* XÓA */}
+                        <button
+                          onClick={() => handleDelete(ls.loai_sach_id)}
+                          className="btn btn-outline-danger d-flex align-items-center gap-2 fw-bold shadow-sm border-2"
+                          style={{
+                            borderRadius: "16px",
+                            padding: "10px 20px",
+                            minWidth: "110px",
+                            fontSize: "1rem",
+                            transition: "all 0.3s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f8d7da";
+                            e.currentTarget.style.transform = "translateY(-3px)";
+                            e.currentTarget.style.boxShadow = "0 8px 20px rgba(220,53,69,0.3)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "";
+                            e.currentTarget.style.transform = "";
+                            e.currentTarget.style.boxShadow = "";
+                          }}
+                        >
+                          Xóa
+                        </button>
+
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} className="text-center text-muted py-4 fs-5">
-                    <i className="bi bi-bookmark-x me-2 fs-4"></i>
+                  <td colSpan={3} className="text-center text-muted py-5 fs-4">
                     Chưa có loại sách nào
                   </td>
                 </tr>
@@ -268,34 +309,18 @@ export default function AdminLoaiSachPage() {
         </div>
       </div>
 
-      {/* 🟢 Modal thêm/sửa loại sách */}
-      <Modal
-        show={showModal}
-        onHide={() => setShowModal(false)}
-        centered
-        backdrop="static"
-      >
-        <Modal.Header
-          closeButton
-          style={{ background: "#f4f7fc", borderBottom: "1px solid #dadce6" }}
-        >
+      {/* Modal thêm/sửa loại sách */}
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered backdrop="static">
+        <Modal.Header closeButton style={{ background: "#f4f7fc", borderBottom: "1px solid #dadce6" }}>
           <Modal.Title className="fw-bold" style={{ color: "#21409A" }}>
-            {editing ? (
-              <>
-                <i className="bi bi-pencil-square me-2"></i>Sửa loại sách
-              </>
-            ) : (
-              <>
-                <i className="bi bi-plus-circle me-2"></i>Thêm loại sách
-              </>
-            )}
+            {editing ? "Sửa loại sách" : "Thêm loại sách"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold" style={{ color: "#2154C5" }}>
-                Tên loại sách <span className="text-danger fw-bolder">*</span>
+                Tên loại sách <span className="text-danger">*</span>
               </Form.Label>
               <Form.Control
                 type="text"
@@ -305,7 +330,7 @@ export default function AdminLoaiSachPage() {
                 style={{
                   borderRadius: "10px",
                   border: "2px solid #e0e0e0",
-                  padding: "10px",
+                  padding: "12px",
                   fontSize: "1.1rem",
                 }}
                 autoFocus
@@ -314,104 +339,65 @@ export default function AdminLoaiSachPage() {
           </Form>
         </Modal.Body>
         <Modal.Footer style={{ background: "#f4f7fc", borderTop: "1px solid #dadce6" }}>
-          <Button
-            variant="secondary"
-            className="px-4 fw-semibold"
-            style={{ borderRadius: "8px" }}
-            onClick={() => setShowModal(false)}
-          >
-            <i className="bi bi-x-circle me-2"></i>Hủy
+          <Button variant="secondary" className="px-4 fw-semibold" style={{ borderRadius: "8px" }} onClick={() => setShowModal(false)}>
+            Hủy
           </Button>
-          <Button
-            variant="primary"
-            className="px-4 fw-semibold"
-            style={{ borderRadius: "8px" }}
-            onClick={handleSave}
-          >
-            <i className="bi bi-check-circle me-2"></i>Lưu
+          <Button variant="primary" className="px-4 fw-semibold" style={{ borderRadius: "8px" }} onClick={handleSave}>
+            Lưu
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* 📘 Modal xem sách thuộc loại */}
-      <Modal
-        show={showBooksModal}
-        onHide={() => setShowBooksModal(false)}
-        size="lg"
-        centered
-      >
-        <Modal.Header
-          closeButton
-          style={{ background: "#f4f7fc", borderBottom: "1px solid #dadce6" }}
-        >
+      {/* Modal xem sách thuộc loại */}
+      <Modal show={showBooksModal} onHide={() => setShowBooksModal(false)} size="lg" centered>
+        <Modal.Header closeButton style={{ background: "#f4f7fc", borderBottom: "1px solid #dadce6" }}>
           <Modal.Title className="fw-bold" style={{ color: "#2154C5" }}>
-            <i className="bi bi-book-half me-2"></i>
-            Danh sách sách thuộc loại{" "}
-            <span className="fw-bold" style={{ color: "#2452b5" }}>
-              {selectedLoai?.ten_loai}
-            </span>
+            Danh sách sách thuộc loại: <span className="text-primary">{selectedLoai?.ten_loai}</span>
           </Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ background: "#fafbfe" }}>
           {books.length > 0 ? (
             <div className="table-responsive">
-              <Table hover bordered className="align-middle mb-0">
+              <Table hover bordered className="align-middle">
                 <thead className="text-center" style={{ background: "#eaf1fb" }}>
                   <tr>
-                    <th style={{ width: 60 }}>ID</th>
-                    <th style={{ width: 80 }}>Ảnh</th>
+                    <th>ID</th>
+                    <th>Ảnh</th>
                     <th>Tên sách</th>
                     <th>Tác giả</th>
                     <th>NXB</th>
-                    <th style={{ width: 100 }}>Giá</th>
+                    <th>Giá</th>
                   </tr>
                 </thead>
                 <tbody>
                   {books.map((b, idx) => (
-                    <tr
-                      key={b.sach_id}
-                      style={{
-                        background: idx % 2 ? "#fafdff" : "#f4f8fd"
-                      }}
-                    >
+                    <tr key={b.sach_id} style={{ background: idx % 2 ? "#fafdff" : "#f4f8fd" }}>
                       <td className="text-center fw-semibold">{b.sach_id}</td>
-                      <td className="text-center align-middle">
+                      <td className="text-center">
                         <Image
                           src={b.hinh_sach || "/image/default-book.jpg"}
                           alt={b.ten_sach}
                           width={55}
                           height={70}
                           rounded
-                          style={{
-                            boxShadow: "0 1px 6px rgba(150,170,255,.13), 0 0px 0px #fff",
-                            objectFit: 'cover',
-                            background: "#fff"
-                          }}
+                          style={{ objectFit: "cover", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
                         />
                       </td>
                       <td>
-                        <span className="fw-bold" style={{ color: "#2255aa" }}>{b.ten_sach}</span>
-                        <div className="text-secondary small" title={b.mo_ta}>
-                          {b.mo_ta && b.mo_ta.length > 40
-                            ? b.mo_ta.substring(0, 40) + "..."
-                            : b.mo_ta
-                          }
-                        </div>
+                        <div className="fw-bold text-primary">{b.ten_sach}</div>
+                        <small className="text-muted">{b.mo_ta?.substring(0, 50)}...</small>
                       </td>
                       <td>{b.ten_tac_gia}</td>
                       <td>{b.ten_NXB}</td>
-                      <td className="fw-semibold text-primary">
-                        {formatPrice(b.gia_sach)}
-                      </td>
+                      <td className="fw-bold text-danger">{formatPrice(b.gia_sach)}</td>
                     </tr>
                   ))}
                 </tbody>
               </Table>
             </div>
           ) : (
-            <p className="text-center text-muted mb-0 py-4 fs-5">
-              <i className="bi bi-emoji-frown me-2"></i>
-              Không có sách nào trong loại này.
+            <p className="text-center text-muted py-5 fs-4">
+              Không có sách nào trong loại này
             </p>
           )}
         </Modal.Body>

@@ -16,21 +16,16 @@ type UserShape = {
   vai_tro?: string | number;
 };
 
-// Hàm tính số lượng sản phẩm từ localStorage (đặt ngoài component để tránh re-creation)
+
+// ĐÃ SỬA: Đếm đúng số sản phẩm (mặt hàng), không phải tổng số lượng
 const calculateCartCount = (): number => {
   if (typeof window === 'undefined') return 0;
   try {
     const cart = localStorage.getItem('cart');
-    // Giả sử 'cart' lưu trữ mảng các sản phẩm
-    const items = cart ? JSON.parse(cart) : [];
-    // Tính tổng số lượng (quantity) của tất cả sản phẩm
-    const totalCount = items.reduce(
-      (total: number, item: any) => total + (item.quantity || 1),
-      0
-    );
-    return totalCount;
+    if (!cart) return 0;
+    const items = JSON.parse(cart);
+    return Array.isArray(items) ? items.length : 0;
   } catch {
-    console.error('Lỗi khi phân tích giỏ hàng từ localStorage.');
     return 0;
   }
 };
@@ -65,7 +60,7 @@ export default function Header() {
       }
     }
   
-    // ⭐ CHỈ CẬP NHẬT CART KHI ĐĂNG NHẬP
+    // CHỈ CẬP NHẬT CART KHI ĐĂNG NHẬP (khi có token)
     const token = localStorage.getItem("token");
     if (token) {
       setCartItemCount(calculateCartCount());
@@ -86,7 +81,7 @@ export default function Header() {
         setUser(null);
       }
   
-      // ⭐ cập nhật lại giỏ hàng sau đăng nhập
+      // cập nhật lại giỏ hàng sau đăng nhập
       const tokenAfter = localStorage.getItem("token");
       setCartItemCount(tokenAfter ? calculateCartCount() : 0);
     };
@@ -110,6 +105,10 @@ export default function Header() {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     setUser(null);
+    // Gửi sự kiện để cập nhật trạng thái giỏ hàng sau khi đăng xuất
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('cart-update')); 
+    }
     router.push('/auth/dangnhap');
   };
 
@@ -129,7 +128,6 @@ export default function Header() {
       <header className="admin-header p-3 d-flex justify-content-end bg-white border-bottom shadow-sm">
         {user ? (
           <Dropdown align="end">
-            {/* ... Phần dropdown menu đã có ... */}
             <Dropdown.Toggle variant="light" id="dropdown-user" className="user-toggle">
               <i className="bi bi-person-circle fs-4"></i>
             </Dropdown.Toggle>
@@ -138,7 +136,8 @@ export default function Header() {
               <Dropdown.Item href="/auth/doi-pass">Đổi mật khẩu</Dropdown.Item>
               <Dropdown.Item href="/orders">Đơn hàng của bạn</Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.Item onClick={handleLogout} className="text-danger">
+              {/* Nút Đăng xuất - ÁP DỤNG HOVER ĐỎ */}
+              <Dropdown.Item onClick={handleLogout} className="text-danger text-danger-hover">
                 Đăng xuất
               </Dropdown.Item>
             </Dropdown.Menu>
@@ -163,13 +162,23 @@ export default function Header() {
             <span className="brand-name"></span>
           </Link>
 
-          {/* NAVIGATION */}
+          {/* NAVIGATION - Cấu trúc đã sửa để đảm bảo Hover hoạt động */}
           <nav className="header-nav d-none d-md-flex align-items-center justify-content-center flex-grow-1">
-            <Link href="/home" className="nav-link">Trang chủ</Link>
-            <Link href="/products" className="nav-link">Sản phẩm</Link>
-            <Link href="/policy" className="nav-link">Chính sách</Link>
-            <Link href="/contact" className="nav-link">Liên hệ</Link>
-            <Link href="/about" className="nav-link">Giới thiệu</Link>
+            <Link href="/home" legacyBehavior passHref>
+              <a className="nav-link">Trang chủ</a>
+            </Link>
+            <Link href="/products" legacyBehavior passHref>
+              <a className="nav-link">Sản phẩm</a>
+            </Link>
+            <Link href="/policy" legacyBehavior passHref>
+              <a className="nav-link">Chính sách</a>
+            </Link>
+            <Link href="/contact" legacyBehavior passHref>
+              <a className="nav-link">Liên hệ</a>
+            </Link>
+            <Link href="/about" legacyBehavior passHref>
+              <a className="nav-link">Giới thiệu</a>
+            </Link>
           </nav>
 
           {/* SEARCH + HOTLINE + CART + USER */}
@@ -225,7 +234,8 @@ export default function Header() {
                   )}
                   
                   <Dropdown.Divider />
-                  <Dropdown.Item onClick={handleLogout} className="text-danger">
+                  {/* Nút Đăng xuất - ÁP DỤNG HOVER ĐỎ */}
+                  <Dropdown.Item onClick={handleLogout} className="text-danger text-danger-hover">
                     Đăng xuất
                   </Dropdown.Item>
                 </Dropdown.Menu>
@@ -269,21 +279,35 @@ export default function Header() {
         }
 
         .header-nav {
-          gap: 1.8rem; 
+          gap: 1.2rem; 
         }
-
+        
         .header-nav .nav-link {
           color: #2c3e50;
           font-weight: 600;
           border-radius: 8px;
-          padding: 8px 14px;
+          padding: 8px 10px; 
           transition: all 0.2s ease;
+          text-decoration: none; 
+          display: inline-block; 
         }
 
-        .header-nav .nav-link:hover {
-          background: rgba(255, 193, 7, 0.2);
-          color: #d4a017;
+        /* ✨ ĐÃ CHỈNH: Hover màu VÀNG cho NAV links */
+        .header-nav .nav-link:hover,
+        .header-nav .nav-link:focus { 
+          background: #ffc107 !important; /* Đổi thành màu vàng Bootstrap */
+          color: #2c3e50 !important;     /* Đổi thành màu đen/tối để dễ đọc */
           transform: translateY(-2px);
+        }
+        
+        /* Hover màu đỏ cho nút Đăng xuất (GIỮ NGUYÊN MÀU ĐỎ CHO LOGOUT) */
+        .dropdown-menu .text-danger-hover {
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .dropdown-menu .text-danger-hover:hover {
+            color: #fff !important; 
+            background-color: #dc3545 !important; 
         }
         
         .search-form {
