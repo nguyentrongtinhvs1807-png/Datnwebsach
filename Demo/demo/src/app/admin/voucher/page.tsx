@@ -21,7 +21,7 @@ export default function AdminVoucherPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
 
-  // 🧾 Lấy danh sách voucher từ API Node.js
+  // Lấy danh sách voucher từ API Node.js
   const fetchVouchers = async () => {
     try {
       const res = await fetch("http://localhost:3003/voucher");
@@ -36,7 +36,7 @@ export default function AdminVoucherPage() {
     fetchVouchers();
   }, []);
 
-  // 💾 Lưu hoặc cập nhật voucher
+  // Lưu hoặc cập nhật voucher
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const method = editingVoucher?.giam_gia_id ? "PUT" : "POST";
@@ -55,7 +55,7 @@ export default function AdminVoucherPage() {
     fetchVouchers();
   };
 
-  // 🗑️ Xoá voucher
+  // Xoá voucher
   const handleDelete = async (id: number) => {
     if (confirm("Bạn có chắc chắn muốn xoá voucher này?")) {
       await fetch(`http://localhost:3003/voucher/${id}`, { method: "DELETE" });
@@ -66,7 +66,7 @@ export default function AdminVoucherPage() {
   return (
     <Container className="py-5">
       <h2 className="fw-bold mb-4 text-primary text-center">
-        🎟️ Quản lý Mã Giảm Giá
+         Quản lý Mã Giảm Giá
       </h2>
 
       <div className="text-end mb-3">
@@ -155,13 +155,13 @@ export default function AdminVoucherPage() {
         </tbody>
       </Table>
 
-      {/* 🧩 Modal Thêm/Sửa Voucher */}
+      {/* Modal Thêm/Sửa Voucher */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>
             {editingVoucher?.giam_gia_id
               ? "✏️ Chỉnh sửa Voucher"
-              : "➕ Thêm Voucher mới"}
+              : " Thêm Voucher mới"}
           </Modal.Title>
         </Modal.Header>
 

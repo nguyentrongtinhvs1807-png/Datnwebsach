@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -14,82 +14,142 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-type RevenueItem = { month: string; total: number };
-
-type Stats = {
-  products: number;
-  users: number;
-  orders: number;
-  revenue: RevenueItem[];
-};
-
-export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // ✅ Dữ liệu giả lập API
-    setTimeout(() => {
-      setStats({
-        products: 53,
-        users: 3,
-        orders: 57,
-        revenue: [
-          { month: "Tháng 1/2025", total: 4200000 },
-          { month: "Tháng 2/2025", total: 5800000 },
-          { month: "Tháng 3/2025", total: 6500000 },
-          { month: "Tháng 4/2025", total: 7200000 },
-          { month: "Tháng 5/2025", total: 6900000 },
-        ],
-      });
-    }, 1000);
+    const fetchStats = async () => {
+      try {
+        const [sachRes, nguoiDungRes, donHangRes] = await Promise.all([
+          fetch("http://localhost:3003/sach"),
+          fetch("http://localhost:3003/nguoi_dung"),
+          fetch("http://localhost:3003/don_hang"), 
+        ]);
+
+        const sach = await sachRes.json();
+        const nguoiDung = await nguoiDungRes.json();
+        const donHang = await donHangRes.json();
+
+        // Tính doanh thu
+        let totalRevenue = 0;
+        let pending = 0;
+        let completed = 0;
+        const revenueByMonth: Record<string, number> = {};
+
+        donHang.forEach((dh: any) => {
+          const tong = Number(dh.tong_tien) || 0;
+          if (tong > 0) {
+            totalRevenue += tong;
+
+            const date = new Date(dh.ngay_dat || dh.ngay_dat_hang || Date.now());
+            const key = `${date.getMonth() + 1}/${date.getFullYear()}`;
+            revenueByMonth[key] = (revenueByMonth[key] || 0) + tong;
+
+            const status = (dh.trang_thai || "").toLowerCase();
+            if (status.includes("chờ") || status.includes("giao")) pending++;
+            if (status.includes("hoàn thành") || status.includes("thành công")) completed++;
+          }
+        });
+
+        const monthlyData = Object.keys(revenueByMonth)
+          .sort((a, b) => {
+            const [m1, y1] = a.split("/").map(Number);
+            const [m2, y2] = b.split("/").map(Number);
+            return y2 - y1 || m2 - m1;
+          })
+          .slice(0, 6)
+          .map(key => ({ month: `Tháng ${key}`, total: revenueByMonth[key] }))
+          .reverse();
+
+        setStats({
+          totalProducts: Array.isArray(sach) ? sach.length : 0,
+          totalUsers: Array.isArray(nguoiDung)
+            ? nguoiDung.filter((u: any) => u.role !== "admin" && u.vai_tro !== "admin").length
+            : 0,
+          totalOrders: Array.isArray(donHang) ? donHang.length : 0,
+          totalRevenue,
+          pendingOrders: pending,
+          completedOrders: completed,
+          monthlyRevenue: monthlyData.length > 0 ? monthlyData : [{ month: "Chưa có", total: 0 }],
+        });
+      } catch (err) {
+        console.error("Lỗi:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
   }, []);
 
-  if (!stats) return <p className="p-6">Đang tải dữ liệu thống kê...</p>;
+  const formatPrice = (price: number) => price.toLocaleString("vi-VN") + " ₫";
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-2xl">Đang tải...</div>;
 
   const chartData = {
-    labels: stats.revenue.map((r) => r.month),
-    datasets: [
-      {
-        label: "Doanh thu (VNĐ)",
-        data: stats.revenue.map((r) => r.total),
-        backgroundColor: "rgba(54, 162, 235, 0.6)",
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: { position: "top" as const },
-      title: { display: true, text: "Doanh thu theo tháng" },
-    },
+    labels: stats.monthlyRevenue.map((r: any) => r.month),
+    datasets: [{
+      label: "Doanh thu (VNĐ)",
+      data: stats.monthlyRevenue.map((r: any) => r.total),
+      backgroundColor: "rgba(54, 162, 235, 0.7)",
+      borderRadius: 8,
+    }],
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">📊 Bảng thống kê</h1>
+    <div className="container-fluid py-5 px-4 bg-gray-50 min-h-screen">
+      <h1 className="text-3xl font-bold text-center mb-8 text-primary">Bảng Điều Khiển - PIBOOK</h1>
 
-      {/* ✅ 3 BOX thống kê */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
-        <div className="bg-blue-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold">Sản phẩm</h2>
-          <p className="text-3xl font-bold">{stats.products}</p>
+      <div className="row g-4 mb-5">
+        <div className="col-md-3">
+          <div className="bg-gradient-purple text-white p-5 rounded-3 shadow-lg text-center">
+            <h5>Tổng Sản Phẩm</h5>
+            <h2 className="display-4">{stats.totalProducts}</h2>
+          </div>
         </div>
-
-        <div className="bg-green-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold">Đơn hàng</h2>
-          <p className="text-3xl font-bold">{stats.orders}</p>
+        <div className="col-md-3">
+          <div className="bg-gradient-pink text-white p-5 rounded-3 shadow-lg text-center">
+            <h5>Tổng Đơn Hàng</h5>
+            <h2 className="display-4">{stats.totalOrders}</h2>
+          </div>
         </div>
-
-        <div className="bg-yellow-200 p-6 rounded-2xl text-center">
-          <h2 className="text-lg font-semibold">Người dùng</h2>
-          <p className="text-3xl font-bold">{stats.users}</p>
+        <div className="col-md-3">
+          <div className="bg-gradient-blue text-white p-5 rounded-3 shadow-lg text-center">
+            <h5>Khách Hàng</h5>
+            <h2 className="display-4 text-info">{stats.totalUsers}</h2>
+          </div>
+        </div>
+        <div className="col-md-3">
+          <div className="bg-gradient-green text-white p-5 rounded-3 shadow-lg text-center">
+            <h5>Tổng Doanh Thu</h5>
+            <h2 className="display-4 text-warning">{formatPrice(stats.totalRevenue)}</h2>
+          </div>
         </div>
       </div>
 
-      {/* ✅ Biểu đồ */}
-      <div className="bg-white shadow p-6 rounded-2xl">
-        <Bar data={chartData} options={options} />
+      <div className="row g-4">
+        <div className="col-md-6">
+          <div className="bg-warning text-dark p-4 rounded-3 text-center shadow">
+            <h5>Đơn chờ xử lý</h5>
+            <h1 className="display-3 text-danger">{stats.pendingOrders}</h1>
+          </div>
+        </div>
+        <div className="col-md-6">
+          <div className="bg-success text-white p-4 rounded-3 text-center shadow">
+            <h5>Đơn hoàn thành</h5>
+            <h1 className="display-3">{stats.completedOrders}</h1>
+          </div>
+        </div>
+      </div>
+
+      <div className="card mt-5 shadow-lg">
+        <div className="card-header bg-primary text-white">
+          <h4>Doanh thu 6 tháng gần nhất</h4>
+        </div>
+        <div className="card-body" style={{ height: "400px" }}>
+          <Bar data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
+        </div>
       </div>
     </div>
   );

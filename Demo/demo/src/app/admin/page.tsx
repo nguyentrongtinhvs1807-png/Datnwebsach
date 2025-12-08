@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import AdminProduct from "@/components/admin.product";
 import Sidebar from "@/components/sidebar";
 import VoucherManager from "@/components/voucher.manager";
-import OrdersPage from "@/app/admin/orders/page"; 
-import AdminDanhMucPage from "@/app/admin/danhmuc/page"; 
+import OrdersPage from "@/app/admin/orders/page";
+import AdminDanhMucPage from "@/app/admin/danhmuc/page";
 import CommentPage from "./comments/page";
 
 import {
@@ -22,13 +22,337 @@ import { Bar } from "react-chartjs-2";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+function Dashboard() {
+  const [stats, setStats] = useState<any>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalProducts: 0,
+    totalUsers: 0,
+    topSelling: [],
+    topStock: [],
+    revenueData: [],
+    filteredRevenue: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  const [filterType, setFilterType] = useState<"month" | "quarter" | "custom">("month");
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [quarter, setQuarter] = useState(Math.floor(new Date().getMonth() / 3) + 1);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // FETCH ĐỦ 4 BẢNG – BẮT BUỘC CÓ don_hang_ct ĐỂ TÍNH TOP BÁN CHẠY
+      const [booksRes, usersRes, ordersRes, orderDetailsRes] = await Promise.all([
+        fetch("http://localhost:3003/sach"),
+        fetch("http://localhost:3003/nguoi_dung"),
+        fetch("http://localhost:3003/orders"),
+        fetch("http://localhost:3003/don-hang-ct"), // ĐÚNG ĐƯỜNG DẪN BẠN ĐÃ CÓ!
+      ]);
+  
+      const books = await booksRes.json();
+      const users = await usersRes.json();
+      const orders = await ordersRes.json();
+       const orderDetails = await orderDetailsRes.json(); // DỮ LIỆU CHI TIẾT ĐƠN HÀNG
+  
+      // Thống kê cơ bản
+      const totalRevenue = orders.reduce((sum: number, o: any) => sum + Number(o.tong_tien || 0), 0);
+      const totalOrders = orders.length;
+      const totalProducts = Array.isArray(books) ? books.length : 0;
+      const totalUsers = Array.isArray(users)
+        ? users.filter((u: any) => (u.role || u.vai_tro) !== "admin").length
+        : 0;
+  
+      // TOP 10 BÁN CHẠY – LẤY TỪ BẢNG don_hang_ct (CHUẨN NHẤT, NHANH NHẤT)
+      const productSales: Record<string, { name: string; quantity: number; revenue: number }> = {};
+  
+      // TOP 10 BÁN CHẠY – SIÊU CHẮC CHẮN 100%
+if (Array.isArray(orderDetails) && orderDetails.length > 0) {
+  orderDetails.forEach((ct: any) => {
+    const sachId = String(ct.sach_id || ct.Sach_id || ct.book_id || "");
+    const qty = Number(ct.so_luong || ct.So_luong || ct.quantity || 0);
+    
+    // SIÊU FIX GIÁ – BẮT ĐƯỢC MỌI TRƯỜNG HỢP
+    const price = Number(
+      ct.gia || 
+      ct.Gia || 
+      ct.don_gia || 
+      ct.Don_gia || 
+      ct.price || 
+      ct.donGia || 
+      ct.gia_ban ||
+      ct.giaban ||
+      0
+    );
+
+    if (!sachId || qty <= 0 || price <= 0) return;
+
+    if (!productSales[sachId]) {
+      const book = books.find((b: any) => String(b.sach_id || b.id) === sachId);
+      productSales[sachId] = {
+        name: book?.ten_sach || `Sách #${sachId}`,
+        quantity: 0,
+        revenue: 0,
+      };
+    }
+
+    productSales[sachId].quantity += qty;
+    productSales[sachId].revenue += price * qty;
+  });
+}
+
+const topSelling = Object.values(productSales)
+  .sort((a: any, b: any) => b.revenue - a.revenue)
+  .slice(0, 10);
+  
+      // Top 10 tồn kho
+      const topStock = Array.isArray(books)
+        ? books
+            .map((b: any) => ({
+              name: b.ten_sach || "Không tên",
+              stock: Number(b.ton_kho_sach) || 0,
+            }))
+            .sort((a: any, b: any) => b.stock - a.stock)
+            .slice(0, 10)
+        : [];
+  
+      // Lọc doanh thu theo thời gian (giữ nguyên như cũ)
+      let filteredOrders = orders;
+  
+      if (filterType === "month" && month) {
+        const [yStr, mStr] = month.split("-");
+        const y = Number(yStr);
+        const m = Number(mStr);
+        filteredOrders = orders.filter((o: any) => {
+          const d = new Date(o.ngay_dat);
+          return d.getFullYear() === y && d.getMonth() + 1 === m;
+        });
+      } else if (filterType === "quarter") {
+        const startMonth = (quarter - 1) * 3;
+        filteredOrders = orders.filter((o: any) => {
+          const d = new Date(o.ngay_dat);
+          return d.getFullYear() === year && d.getMonth() >= startMonth && d.getMonth() < startMonth + 3;
+        });
+      } else if (filterType === "custom" && fromDate && toDate) {
+        const from = new Date(fromDate);
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999);
+        filteredOrders = orders.filter((o: any) => {
+          const d = new Date(o.ngay_dat);
+          return d >= from && d <= to;
+        });
+      }
+  
+      const revenueByDay: Record<string, number> = {};
+      filteredOrders.forEach((o: any) => {
+        const date = new Date(o.ngay_dat).toLocaleDateString("vi-VN");
+        revenueByDay[date] = (revenueByDay[date] || 0) + Number(o.tong_tien || 0);
+      });
+  
+      const revenueData = Object.entries(revenueByDay)
+        .map(([date, total]) => ({ date, total }))
+        .sort((a: any, b: any) => {
+          const [d1, m1, y1] = a.date.split("/").map(Number);
+          const [d2, m2, y2] = b.date.split("/").map(Number);
+          return new Date(y1, m1 - 1, d1).getTime() - new Date(y2, m2 - 1, d2).getTime();
+        });
+  
+      const filteredRevenue = filteredOrders.reduce((s: number, o: any) => s + Number(o.tong_tien || 0), 0);
+  
+      setStats({
+        totalRevenue,
+        totalOrders,
+        totalProducts,
+        totalUsers,
+        topSelling,
+        topStock,
+        revenueData,
+        filteredRevenue,
+      });
+    } catch (err) {
+      console.error("Lỗi tải dashboard:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [filterType, month, quarter, year, fromDate, toDate]);
+
+  const chartData = {
+    labels: stats.revenueData.map((d: any) => d.date),
+    datasets: [{
+      label: "Doanh thu (VNĐ)",
+      data: stats.revenueData.map((d: any) => d.total),
+      backgroundColor: "rgba(67, 105, 227, 0.8)",
+      borderColor: "#4369e3",
+      borderWidth: 2,
+      borderRadius: 6,
+    }]
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border text-primary" style={{ width: "4rem", height: "4rem" }}></div>
+        <p className="mt-4 fs-4 text-muted">Đang tải dữ liệu thống kê...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h4 className="fw-bold mb-4" style={{ color: "#21409A" }}>Thống Kê Doanh Thu & Sản Phẩm</h4>
+
+      {/* Bộ lọc thời gian */}
+      <div className="bg-white p-4 rounded-4 shadow-sm mb-4">
+        <div className="row g-3 align-items-end">
+          <div className="col-md-2">
+            <label className="form-label fw-bold">Loại thống kê</label>
+            <select className="form-select" value={filterType} onChange={(e) => setFilterType(e.target.value as any)}>
+              <option value="month">Theo tháng</option>
+              <option value="quarter">Theo quý</option>
+              <option value="custom">Tuỳ chọn ngày</option>
+            </select>
+          </div>
+
+          {filterType === "month" && (
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Chọn tháng</label>
+              <input type="month" className="form-control" value={month} onChange={(e) => setMonth(e.target.value)} />
+            </div>
+          )}
+
+          {filterType === "quarter" && (
+            <>
+              <div className="col-md-2">
+                <label className="form-label fw-bold">Quý</label>
+                <select className="form-select" value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>
+                  <option value={1}>Quý 1</option>
+                  <option value={2}>Quý 2</option>
+                  <option value={3}>Quý 3</option>
+                  <option value={4}>Quý 4</option>
+                </select>
+              </div>
+              <div className="col-md-2">
+                <label className="form-label fw-bold">Năm</label>
+                <input type="number" className="form-control" value={year} onChange={(e) => setYear(Number(e.target.value))} min="2020" />
+              </div>
+            </>
+          )}
+
+          {filterType === "custom" && (
+            <>
+              <div className="col-md-3">
+                <label className="form-label fw-bold">Từ ngày</label>
+                <input type="date" className="form-control" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              </div>
+              <div className="col-md-3">
+                <label className="form-label fw-bold">Đến ngày</label>
+                <input type="date" className="form-control" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              </div>
+            </>
+          )}
+
+          <div className="col-md-3">
+            <div className="alert alert-success py-3 mb-0 text-center">
+              <strong className="fs-5">Doanh thu:</strong><br />
+              <span className="fs-4 fw-bold">{formatCurrency(stats.filteredRevenue)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Biểu đồ doanh thu */}
+      <div className="bg-white p-4 rounded-4 shadow mb-5">
+        <h5 className="fw-bold mb-3">Biểu đồ doanh thu theo ngày</h5>
+        <div style={{ height: "400px" }}>
+          <Bar data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
+        </div>
+      </div>
+
+      <div className="row g-4">
+        {/* Top 10 sản phẩm bán chạy */}
+        <div className="col-lg-6">
+          <div className="bg-white p-4 rounded-4 shadow">
+            <h5 className="fw-bold mb-3 text-success">Top 10 Sản Phẩm Bán Chạy Nhất</h5>
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-success">
+                  <tr>
+                    <th>STT</th>
+                    <th>Sản phẩm</th>
+                    <th className="text-center">Số lượng</th>
+                    <th className="text-end">Doanh thu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.topSelling.length === 0 ? (
+                    <tr><td colSpan={4} className="text-center py-4 text-muted">Chưa có đơn hàng</td></tr>
+                  ) : (
+                    stats.topSelling.map((p: any, i: number) => (
+                      <tr key={i}>
+                        <td><span className="badge bg-warning text-dark fs-6">{i + 1}</span></td>
+                        <td className="fw-medium">{p.name}</td>
+                        <td className="text-center fw-bold">{p.quantity.toLocaleString()}</td>
+                        <td className="text-end text-danger fw-bold">{formatCurrency(p.revenue)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Top 10 tồn kho */}
+        <div className="col-lg-6">
+          <div className="bg-white p-4 rounded-4 shadow">
+            <h5 className="fw-bold mb-3 text-info">Top 10 Sản Phẩm Tồn Kho Nhiều Nhất</h5>
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-info">
+                  <tr>
+                    <th>STT</th>
+                    <th>Sản phẩm</th>
+                    <th className="text-center">Tồn kho</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.topStock.length === 0 ? (
+                    <tr><td colSpan={3} className="text-center py-4 text-muted">Không có dữ liệu</td></tr>
+                  ) : (
+                    stats.topStock.map((p: any, i: number) => (
+                      <tr key={i}>
+                        <td><span className="badge bg-info text-dark fs-6">{i + 1}</span></td>
+                        <td className="fw-medium">{p.name}</td>
+                        <td className="text-center fw-bold text-primary">{p.stock.toLocaleString()}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ========== QUẢN LÝ NGƯỜI DÙNG ==========
 function UserManager() {
   const [users, setUsers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [showHidden, setShowHidden] = useState(false);
 
-  // 🔹 Lấy danh sách người dùng từ server
   useEffect(() => {
     fetch("http://localhost:3003/users")
       .then((res) => res.json())
@@ -36,57 +360,37 @@ function UserManager() {
       .catch(() => setUsers([]));
   }, []);
 
-  //  Ẩn người dùng (PATCH)
   const hideUser = async (id: number) => {
-    if (!confirm("👻 Bạn có chắc muốn ẨN người dùng này (không xoá dữ liệu)?")) return;
-
+    if (!confirm("Bạn có chắc muốn ẨN người dùng này (không xoá dữ liệu)?")) return;
     try {
-      const res = await fetch(`http://localhost:3003/users/${id}/hide`, {
-        method: "PATCH",
-      });
+      const res = await fetch(`http://localhost:3003/users/${id}/hide`, { method: "PATCH" });
       const data = await res.json();
-
       if (res.ok) {
         alert(" " + data.message);
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.nguoi_dung_id === id ? { ...u, is_hidden: 1 } : u
-          )
-        );
+        setUsers((prev) => prev.map((u) => u.nguoi_dung_id === id ? { ...u, is_hidden: 1 } : u));
       } else {
-        alert("❌ " + (data.error || "Lỗi khi ẩn người dùng"));
+        alert(" " + (data.error || "Lỗi khi ẩn người dùng"));
       }
     } catch (err) {
-      console.error("Lỗi khi gọi API hide:", err);
       alert("Không thể kết nối đến server!");
     }
   };
 
-  //  Hiện lại người dùng (PATCH)
   const unhideUser = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:3003/users/${id}/unhide`, {
-        method: "PATCH",
-      });
+      const res = await fetch(`http://localhost:3003/users/${id}/unhide`, { method: "PATCH" });
       const data = await res.json();
-
       if (res.ok) {
-        alert("👁️ " + data.message);
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.nguoi_dung_id === id ? { ...u, is_hidden: 0 } : u
-          )
-        );
+        alert(" " + data.message);
+        setUsers((prev) => prev.map((u) => u.nguoi_dung_id === id ? { ...u, is_hidden: 0 } : u));
       } else {
-        alert("❌ " + (data.error || "Lỗi khi hiện lại người dùng"));
+        alert(" " + (data.error || "Lỗi khi hiện lại người dùng"));
       }
     } catch (err) {
-      console.error("Lỗi khi gọi API unhide:", err);
       alert("Không thể kết nối đến server!");
     }
   };
 
-  // 🔹 Lọc danh sách theo từ khoá và trạng thái
   const filtered = users
     .filter((u) => (showHidden ? true : u.is_hidden !== 1))
     .filter((u) => {
@@ -99,22 +403,8 @@ function UserManager() {
   return (
     <div>
       <div className="mb-4 d-flex gap-2">
-        <input
-          type="text"
-          className="form-control"
-          placeholder="Tìm kiếm theo tên hoặc email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            borderRadius: "10px",
-            border: "2px solid #e0e0e0",
-            padding: "10px",
-          }}
-        />
-        <button
-          className="btn btn-outline-secondary"
-          onClick={() => setShowHidden((p) => !p)}
-        >
+        <input type="text" className="form-control" placeholder="Tìm kiếm theo tên hoặc email..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px" }} />
+        <button className="btn btn-outline-secondary" onClick={() => setShowHidden((p) => !p)}>
           {showHidden ? "Ẩn người bị ẩn" : "Hiện người bị ẩn"}
         </button>
       </div>
@@ -126,13 +416,7 @@ function UserManager() {
       ) : (
         <div className="table-responsive shadow-sm rounded-3 overflow-hidden">
           <table className="table table-hover align-middle mb-0">
-            <thead
-              style={{
-                background:
-                  "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)",
-                color: "white",
-              }}
-            >
+            <thead style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}>
               <tr>
                 <th style={{ fontWeight: 600 }}>ID</th>
                 <th style={{ fontWeight: 600 }}>Tên</th>
@@ -144,61 +428,23 @@ function UserManager() {
             </thead>
             <tbody>
               {filtered.map((u) => (
-                <tr
-                  key={u.nguoi_dung_id}
-                  style={{
-                    opacity: u.is_hidden === 1 ? 0.5 : 1,
-                    transition: "opacity 0.3s",
-                  }}
-                >
+                <tr key={u.nguoi_dung_id} style={{ opacity: u.is_hidden === 1 ? 0.5 : 1 }}>
                   <td className="fw-semibold">{u.nguoi_dung_id}</td>
                   <td>{u.ten || u.ho_ten}</td>
                   <td>{u.email}</td>
                   <td>
-                    <span
-                      className={`badge ${
-                        u.role === "admin" ? "bg-danger" : "bg-primary"
-                      }`}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "8px",
-                      }}
-                    >
-                      {u.role === "admin"
-                        ? "Quản trị viên"
-                        : "Người dùng"}
+                    <span className={`badge ${u.role === "admin" ? "bg-danger" : "bg-primary"}`} style={{ padding: "6px 12px", borderRadius: "8px" }}>
+                      {u.role === "admin" ? "Quản trị viên" : "Người dùng"}
                     </span>
                   </td>
                   <td>
-                    {u.is_hidden === 1 ? (
-                      <span className="badge bg-secondary">Đã ẩn</span>
-                    ) : (
-                      <span className="badge bg-success">Hiển thị</span>
-                    )}
+                    {u.is_hidden === 1 ? <span className="badge bg-secondary">Đã ẩn</span> : <span className="badge bg-success">Hiển thị</span>}
                   </td>
                   <td>
                     {u.is_hidden === 1 ? (
-                      <button
-                        className="btn btn-sm btn-outline-success"
-                        onClick={() => unhideUser(u.nguoi_dung_id)}
-                        style={{
-                          borderRadius: "8px",
-                          fontWeight: 500,
-                        }}
-                      >
-                         Hiện lại
-                      </button>
+                      <button className="btn btn-sm btn-outline-success" onClick={() => unhideUser(u.nguoi_dung_id)}>Hiện lại</button>
                     ) : (
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => hideUser(u.nguoi_dung_id)}
-                        style={{
-                          borderRadius: "8px",
-                          fontWeight: 500,
-                        }}
-                      >
-                        👻 Ẩn Người Dùng
-                      </button>
+                      <button className="btn btn-sm btn-outline-danger" onClick={() => hideUser(u.nguoi_dung_id)}>Ẩn Người Dùng</button>
                     )}
                   </td>
                 </tr>
@@ -211,7 +457,6 @@ function UserManager() {
   );
 }
 
-
 // ========== QUẢN LÝ BÌNH LUẬN ==========
 function CommentManager() {
   const [comments, setComments] = useState<any[]>([]);
@@ -220,20 +465,15 @@ function CommentManager() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:3003/comments")
-      .then((res) => res.json())
-      .then((data) => setComments(Array.isArray(data) ? data : []))
-      .catch(() => setComments([]));
-
-    fetch("http://localhost:3003/sach")
-      .then((res) => res.json())
-      .then((data) => setSachs(Array.isArray(data) ? data : []))
-      .catch(() => setSachs([]));
-
-    fetch("http://localhost:3003/users")
-      .then((res) => res.json())
-      .then((data) => setUsers(Array.isArray(data) ? data : []))
-      .catch(() => setUsers([]));
+    Promise.all([
+      fetch("http://localhost:3003/comments").then(r => r.json()),
+      fetch("http://localhost:3003/sach").then(r => r.json()),
+      fetch("http://localhost:3003/users").then(r => r.json()),
+    ]).then(([c, s, u]) => {
+      setComments(Array.isArray(c) ? c : []);
+      setSachs(Array.isArray(s) ? s : []);
+      setUsers(Array.isArray(u) ? u : []);
+    });
   }, []);
 
   const deleteComment = async (id: number) => {
@@ -242,10 +482,8 @@ function CommentManager() {
     setComments((prev) => prev.filter((c) => c.binh_luan_id !== id));
   };
 
-  const getSachName = (id: number) =>
-    sachs.find((s) => s.sach_id === id)?.ten_sach || `Sách #${id}`;
-  const getUserName = (id: number) =>
-    users.find((u) => u.nguoi_dung_id === id)?.ten || `User #${id}`;
+  const getSachName = (id: number) => sachs.find((s) => s.sach_id === id)?.ten_sach || `Sách #${id}`;
+  const getUserName = (id: number) => users.find((u) => u.nguoi_dung_id === id)?.ten || `User #${id}`;
 
   const filtered = comments.filter((c) => {
     const userName = getUserName(c.nguoi_dung_id).toLowerCase();
@@ -257,48 +495,28 @@ function CommentManager() {
   return (
     <div>
       <div className="mb-4">
-        <input
-          type="text"
-          className="form-control"
-          placeholder="Tìm kiếm theo người dùng hoặc nội dung..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px" }}
-        />
+        <input type="text" className="form-control" placeholder="Tìm kiếm theo người dùng hoặc nội dung..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px" }} />
       </div>
       {filtered.length === 0 ? (
-        <div className="text-center py-5">
-          <p className="text-muted fs-5">Không có bình luận nào.</p>
-        </div>
+        <div className="text-center py-5"><p className="text-muted fs-5">Không có bình luận nào.</p></div>
       ) : (
         <div className="table-responsive shadow-sm rounded-3 overflow-hidden">
           <table className="table table-hover align-middle mb-0">
             <thead style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}>
               <tr>
-                <th style={{ fontWeight: 600 }}>ID</th>
-                <th style={{ fontWeight: 600 }}>Sách</th>
-                <th style={{ fontWeight: 600 }}>Người dùng</th>
-                <th style={{ fontWeight: 600 }}>Nội dung</th>
-                <th style={{ fontWeight: 600 }}>Ngày bình luận</th>
-                <th style={{ fontWeight: 600 }}>Thao tác</th>
+                <th>ID</th><th>Sách</th><th>Người dùng</th><th>Nội dung</th><th>Ngày bình luận</th><th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.binh_luan_id} style={{ transition: "background 0.2s" }}>
+                <tr key={c.binh_luan_id}>
                   <td className="fw-semibold">{c.binh_luan_id}</td>
                   <td>{getSachName(c.sach_id)}</td>
                   <td>{getUserName(c.nguoi_dung_id)}</td>
                   <td style={{ maxWidth: "300px", wordBreak: "break-word" }}>{c.nd_bl}</td>
                   <td>{new Date(c.ngay_bl).toLocaleString("vi-VN")}</td>
                   <td>
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => deleteComment(c.binh_luan_id)}
-                      style={{ borderRadius: "8px", fontWeight: 500 }}
-                    >
-                      Ẩn
-                    </button>
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => deleteComment(c.binh_luan_id)}>Ẩn</button>
                   </td>
                 </tr>
               ))}
@@ -310,87 +528,7 @@ function CommentManager() {
   );
 }
 
-// ========== DASHBOARD ==========
-function Dashboard() {
-  const [stats, setStats] = useState<any>(null);
-
-  useEffect(() => {
-    setTimeout(() => {
-      setStats({
-        products: 32,
-        users: 105,
-        orders: 57,
-        revenue: [
-          { month: "Tháng 1", total: 4200000 },
-          { month: "Tháng 2", total: 5800000 },
-          { month: "Tháng 3", total: 6500000 },
-          { month: "Tháng 4", total: 7200000 },
-          { month: "Tháng 5", total: 6900000 },
-        ],
-      });
-    }, 1000);
-  }, []);
-
-  if (!stats) return (
-    <div className="text-center py-5">
-      <div className="spinner-border text-primary" role="status">
-        <span className="visually-hidden">Đang tải...</span>
-      </div>
-      <p className="mt-3 text-muted">Đang tải dữ liệu thống kê...</p>
-    </div>
-  );
-
-  const chartData = {
-    labels: stats.revenue.map((r: any) => r.month),
-    datasets: [
-      {
-        label: "Doanh thu (VNĐ)",
-        data: stats.revenue.map((r: any) => r.total),
-        backgroundColor: "rgba(54, 162, 235, 0.6)",
-      },
-    ],
-  };
-
-  return (
-    <div>
-      <h4 className="fw-bold mb-4" style={{ color: "#21409A" }}>Thống kê tổng quan</h4>
-      <div className="row g-4 mb-4">
-        <div className="col-md-4">
-          <div className="p-4 rounded-4 shadow-sm" style={{ 
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            color: "white"
-          }}>
-            <h5 className="mb-2" style={{ opacity: 0.9 }}>Sản phẩm</h5>
-            <p className="fs-1 fw-bold mb-0">{stats.products}</p>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="p-4 rounded-4 shadow-sm" style={{ 
-            background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-            color: "white"
-          }}>
-            <h5 className="mb-2" style={{ opacity: 0.9 }}>Đơn hàng</h5>
-            <p className="fs-1 fw-bold mb-0">{stats.orders}</p>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="p-4 rounded-4 shadow-sm" style={{ 
-            background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-            color: "white"
-          }}>
-            <h5 className="mb-2" style={{ opacity: 0.9 }}>Người dùng</h5>
-            <p className="fs-1 fw-bold mb-0">{stats.users}</p>
-          </div>
-        </div>
-      </div>
-      <div className="bg-white shadow-sm p-4 rounded-4" style={{ border: "1px solid #e0e0e0" }}>
-        <Bar data={chartData} />
-      </div>
-    </div>
-  );
-}
-
-// ========== TRANG ADMIN ==========
+// ========== TRANG ADMIN CHÍNH ==========
 export default function AdminPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -402,10 +540,9 @@ export default function AdminPage() {
       router.push("/auth/dangnhap");
       return;
     }
-
     const parsed = JSON.parse(storedUser);
     if (parsed.role !== "admin") {
-      alert("⚠️ Bạn không có quyền truy cập trang này!");
+      alert("Bạn không có quyền truy cập trang này!");
       router.push("/");
     } else {
       setUser(parsed);
@@ -419,27 +556,23 @@ export default function AdminPage() {
 
   return (
     <div className="d-flex min-vh-100" style={{ background: "#f5f7fa" }}>
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        handleLogout={handleLogout}
-      />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} handleLogout={handleLogout} />
 
       <main className="flex-grow-1 p-4">
         <div className="d-flex justify-content-between align-items-center mb-4 pb-3" style={{ borderBottom: "2px solid #e0e0e0" }}>
           <div>
-            <h2 className="fw-bold mb-1" style={{ color: "#21409A", letterSpacing: "0.5px" }}>Bảng điều khiển quản trị</h2>
+            <h2 className="fw-bold mb-1" style={{ color: "#21409A" }}>Bảng điều khiển quản trị</h2>
             <p className="text-muted mb-0 small">Quản lý và theo dõi hệ thống</p>
           </div>
           {user && (
-            <div className="text-end p-3 rounded-3" style={{ background: "linear-gradient(90deg, #fff9e6 0%, #ffeecf 100%)", minWidth: "200px" }}>
+            <div className="text-end p-3 rounded-3" style={{ background: "linear-gradient(90deg, #fff9e6 0%, #ffeecf 100%)" }}>
               <div className="fw-semibold text-dark">Xin chào, {user.ten}</div>
               <small className="text-muted">{user.email}</small>
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-4 shadow-sm p-4" style={{ border: "1px solid #e8e8e8" }}>
+        <div className="bg-white rounded-4 shadow-sm p-4">
           {activeTab === "dashboard" && <Dashboard />}
           {activeTab === "products" && (
             <>
@@ -447,34 +580,34 @@ export default function AdminPage() {
               <AdminProduct />
             </>
           )}
-            {activeTab === "comments" && (
+          {activeTab === "comments" && (
             <>
-             <h4 className="fw-bold text-primary mb-3">Quản lý bình luận</h4>
-             <CommentPage />
+              <h4 className="fw-bold text-primary mb-3">Quản lý bình luận</h4>
+              <CommentPage />
             </>
           )}
           {activeTab === "users" && (
             <>
-              <h4 className="fw-bold text-primary mb-3"> Quản lý người dùng</h4>
+              <h4 className="fw-bold text-primary mb-3">Quản lý người dùng</h4>
               <UserManager />
             </>
           )}
           {activeTab === "orders" && (
             <>
-              <h4 className="fw-bold text-primary mb-3"> Quản lý đơn hàng</h4>
+              <h4 className="fw-bold text-primary mb-3">Quản lý đơn hàng</h4>
               <OrdersPage />
             </>
           )}
           {activeTab === "voucher" && (
             <>
-              <h4 className="fw-bold text-primary mb-3"> Quản lý Voucher</h4>
+              <h4 className="fw-bold text-primary mb-3">Quản lý Voucher</h4>
               <VoucherManager />
             </>
           )}
           {activeTab === "danhmuc" && (
             <>
               <h4 className="fw-bold text-primary mb-3">Quản lý Danh Mục</h4>
-              <AdminDanhMucPage /> {/* Gọi đúng trang danh mục */}
+              <AdminDanhMucPage />
             </>
           )}
         </div>

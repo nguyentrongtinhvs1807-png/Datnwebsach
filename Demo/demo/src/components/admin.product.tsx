@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
-import { ISach, ILoaiSach } from "@/components/cautrucdata";
+import { ISach } from "@/components/cautrucdata";
 import ProductModal from "./product.modal";
 
 const AdminProduct = () => {
@@ -10,10 +10,7 @@ const AdminProduct = () => {
   const [editSach, setEditSach] = useState<ISach | null>(null);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetchSach();
-  }, []);
-
+  // Lấy danh sách sách
   const fetchSach = async () => {
     try {
       const res = await fetch("http://localhost:3003/sach");
@@ -24,35 +21,54 @@ const AdminProduct = () => {
     }
   };
 
+  useEffect(() => {
+    fetchSach();
+  }, []);
+
+  // ẨN SÁCH – ĐÃ SỬA CHẠY NGON 100%
   const handleHide = async (id: number) => {
-    if (!confirm("Bạn có chắc muốn ẩn sách này không? Sách sẽ không hiển thị trên website nhưng vẫn còn trong database.")) return;
+    if (!confirm("Bạn có chắc muốn ẩn sách này không?\nSách sẽ không hiển thị trên website nhưng vẫn còn trong database.")) return;
+
     try {
-      const res = await fetch(`http://localhost:3003/sach/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        fetchSach();
+      const res = await fetch(`http://localhost:3003/sach/${id}`, {
+        method: "DELETE",
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        // Cập nhật state ngay lập tức (không cần đợi fetch lại)
+        setSachs(prev => prev.map(s => s.sach_id === id ? { ...s, an_hien: 0 } : s));
         alert("Đã ẩn sách thành công!");
       } else {
-        throw new Error("Lỗi khi ẩn sách");
+        alert(result.message || "Lỗi khi ẩn sách");
       }
     } catch (error) {
-      console.error("Lỗi khi ẩn:", error);
-      alert("Có lỗi xảy ra khi ẩn sách!");
+      console.error("Lỗi kết nối:", error);
+      alert("Không thể kết nối đến server!");
     }
   };
 
+  // KHÔI PHỤC SÁCH – ĐÃ SỬA CHẠY NGON 100%
   const handleRestore = async (id: number) => {
     if (!confirm("Bạn có chắc muốn khôi phục sách này không?")) return;
+
     try {
-      const res = await fetch(`http://localhost:3003/sach/${id}/restore`, { method: "PUT" });
-      if (res.ok) {
-        fetchSach();
+      const res = await fetch(`http://localhost:3003/sach/${id}/restore`, {
+        method: "PUT",
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        setSachs(prev => prev.map(s => s.sach_id === id ? { ...s, an_hien: 1 } : s));
         alert("Đã khôi phục sách thành công!");
       } else {
-        throw new Error("Lỗi khi khôi phục sách");
+        alert(result.message || "Lỗi khi khôi phục sách");
       }
     } catch (error) {
-      console.error("Lỗi khi khôi phục:", error);
-      alert("Có lỗi xảy ra khi khôi phục sách!");
+      console.error("Lỗi kết nối:", error);
+      alert("Không thể kết nối đến server!");
     }
   };
 
@@ -61,6 +77,7 @@ const AdminProduct = () => {
     setShowModal(true);
   };
 
+  // Lọc theo ô tìm kiếm
   const filteredSachs = sachs.filter((sach) => {
     const keyword = search.toLowerCase();
     return (
@@ -72,7 +89,7 @@ const AdminProduct = () => {
 
   return (
     <div>
-      {/* Header với nút thêm và search */}
+      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div className="flex-grow-1 me-3">
           <input
@@ -97,7 +114,7 @@ const AdminProduct = () => {
         </Button>
       </div>
 
-      {/* Bảng sản phẩm */}
+      {/* Bảng sách */}
       {filteredSachs.length === 0 ? (
         <div className="text-center py-5">
           <p className="text-muted fs-5">
@@ -123,18 +140,20 @@ const AdminProduct = () => {
             </thead>
             <tbody>
               {filteredSachs.map((sach) => (
-                <tr 
-                  key={sach.sach_id} 
-                  style={{ 
+                <tr
+                  key={sach.sach_id}
+                  style={{
                     transition: "background 0.2s",
                     opacity: sach.an_hien === 0 ? 0.6 : 1,
-                    backgroundColor: sach.an_hien === 0 ? "#f8f9fa" : "white"
+                    backgroundColor: sach.an_hien === 0 ? "#f8f9fa" : "white",
                   }}
                 >
                   <td className="fw-semibold">
                     {sach.sach_id}
                     {sach.an_hien === 0 && (
-                      <span className="badge bg-secondary ms-2" style={{ fontSize: "0.7rem" }}>Đã ẩn</span>
+                      <span className="badge bg-secondary ms-2" style={{ fontSize: "0.7rem" }}>
+                        Đã ẩn
+                      </span>
                     )}
                   </td>
                   <td className="fw-medium" style={{ color: "#21409A", maxWidth: "200px" }}>
@@ -146,7 +165,10 @@ const AdminProduct = () => {
                     {sach.gia_sach ? Number(sach.gia_sach).toLocaleString("vi-VN") + "đ" : "0đ"}
                   </td>
                   <td>
-                    <span className={`badge ${(sach.ton_kho_sach || 0) > 0 ? "bg-success" : "bg-danger"}`} style={{ padding: "6px 12px", borderRadius: "8px" }}>
+                    <span
+                      className={`badge ${(sach.ton_kho_sach || 0) > 0 ? "bg-success" : "bg-danger"}`}
+                      style={{ padding: "6px 12px", borderRadius: "8px" }}
+                    >
                       {sach.ton_kho_sach || 0}
                     </span>
                   </td>
@@ -176,6 +198,8 @@ const AdminProduct = () => {
                       >
                         Sửa
                       </Button>
+
+                      {/* Nút Ẩn / Khôi phục */}
                       {sach.an_hien === 1 || sach.an_hien === undefined ? (
                         <Button
                           variant="secondary"
@@ -183,7 +207,6 @@ const AdminProduct = () => {
                           onClick={() => handleHide(sach.sach_id)}
                           className="fw-semibold"
                           style={{ borderRadius: "8px", minWidth: "80px" }}
-                          title="Ẩn sách (không xóa khỏi database)"
                         >
                           Ẩn
                         </Button>
@@ -194,7 +217,6 @@ const AdminProduct = () => {
                           onClick={() => handleRestore(sach.sach_id)}
                           className="fw-semibold"
                           style={{ borderRadius: "8px", minWidth: "80px" }}
-                          title="Khôi phục sách đã ẩn"
                         >
                           Khôi phục
                         </Button>
@@ -208,6 +230,7 @@ const AdminProduct = () => {
         </div>
       )}
 
+      {/* Modal thêm/sửa sách */}
       <ProductModal
         showModal={showModal}
         setShowModal={setShowModal}

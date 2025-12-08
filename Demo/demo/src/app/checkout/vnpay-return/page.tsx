@@ -1,4 +1,3 @@
-// app/checkout/vnpay-return/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -25,9 +24,27 @@ export default function VNPayReturnPage() {
         const data = await res.json();
 
         if (data.success) {
-          setStatus('success');
-          setMessage(`Thanh toán thành công đơn hàng #${data.orderCode || searchParams.get('vnp_TxnRef')}!`);
+          const don_hang_id = data.don_hang_id;     // ← ID số thật từ backend
+          const orderCode = data.orderCode;         // ← Mã đơn PIBOOK-xxx để hiển thị
 
+          if (!don_hang_id) {
+            console.error('Backend không trả về don_hang_id!');
+            setStatus('failed');
+            setMessage('Lỗi hệ thống: Không lấy được ID đơn hàng.');
+            return;
+          }
+
+          // CẬP NHẬT TỔNG TIỀN – BẮT BUỘC DÙNG ID SỐ!!!
+          await fetch('http://localhost:3003/api/update-order-total', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: don_hang_id }),
+          });
+
+          setStatus('success');
+          setMessage(`Thanh toán thành công đơn hàng #${orderCode}!`);
+
+          // Xóa giỏ hàng sau khi thanh toán thành công
           localStorage.removeItem('cart');
           localStorage.removeItem('checkoutItems');
           localStorage.removeItem('appliedDiscount');
@@ -45,6 +62,7 @@ export default function VNPayReturnPage() {
     };
 
     const code = searchParams.get('vnp_ResponseCode');
+
     if (code === '00') {
       verifyPayment();
     } else if (code) {
@@ -60,7 +78,6 @@ export default function VNPayReturnPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Hiệu ứng nền */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute top-20 left-20 w-96 h-96 bg-emerald-300 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-20 right-20 w-96 h-96 bg-cyan-300 rounded-full blur-3xl animate-pulse delay-1000"></div>
@@ -80,7 +97,7 @@ export default function VNPayReturnPage() {
           </div>
         )}
 
-        {/* THÀNH CÔNG – ĐẸP NHƯ ƯỚC MƠ */}
+        {/* SUCCESS */}
         {status === 'success' && (
           <div className="bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl p-16 text-center transform transition-all duration-1000 scale-100 hover:scale-[1.02]">
             <div className="relative">
@@ -128,7 +145,7 @@ export default function VNPayReturnPage() {
           </div>
         )}
 
-        {/* THẤT BẠI */}
+        {/* FAILED */}
         {status === 'failed' && (
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-16 text-center">
             <div className="w-32 h-32 mx-auto mb-8 bg-red-100 rounded-full flex items-center justify-center">

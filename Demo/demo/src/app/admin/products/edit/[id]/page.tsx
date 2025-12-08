@@ -25,7 +25,7 @@ export default function EditSachPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // 🟦 Lấy dữ liệu theo ID
+  // Lấy dữ liệu theo ID
   useEffect(() => {
     if (!id) return;
 
@@ -43,7 +43,7 @@ export default function EditSachPage() {
       .finally(() => setLoading(false));
   }, [id, router]);
 
-  // 🟩 Xử lý thay đổi input (ép kiểu số + fix dấu phẩy)
+  //  Xử lý thay đổi input (ép kiểu số + fix dấu phẩy)
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -60,7 +60,7 @@ export default function EditSachPage() {
     setSach({ ...sach, [name]: newValue });
   };
 
-  // 🟥 Gửi PUT cập nhật
+  //  Gửi PUT cập nhật
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sach) return;
@@ -88,7 +88,7 @@ export default function EditSachPage() {
 
       if (!res.ok) throw new Error("Cập nhật thất bại!");
 
-      alert("✅ Cập nhật sách thành công!");
+      alert(" Cập nhật sách thành công!");
       router.push("/admin/products");
     } catch (err) {
       console.error("❌ Lỗi cập nhật:", err);
@@ -98,7 +98,7 @@ export default function EditSachPage() {
     }
   };
 
-  // 🟨 Loading UI
+  //  Loading UI
   if (loading)
     return (
       <div className="text-center mt-5">
@@ -114,7 +114,7 @@ export default function EditSachPage() {
       </p>
     );
 
-  // 🟧 UI Form
+  // UI Form
   return (
     <div className="min-h-screen bg-light py-5">
       <div className="container">

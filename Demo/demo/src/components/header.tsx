@@ -115,12 +115,20 @@ export default function Header() {
   const onSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const q = query.trim();
-    router.push(q ? `/products?q=${encodeURIComponent(q)}` : '/products');
+  
+    if (q) {
+      // CHỈ DÙNG URL PARAM ?q=... → trang /products sẽ tự đọc và tìm kiếm
+      router.push(`/products?q=${encodeURIComponent(q)}`);
+    } else {
+      // Nếu để trống → về trang sản phẩm, không có từ khóa
+      router.push('/products');
+    }
+  
+    // XÓA DÒNG NÀY ĐI (không cần nữa):
+    // sessionStorage.setItem('searchQueryFromHeader', q);
   };
 
-  // ==========================================================
   // LOGIC HIỂN THỊ: PHÂN BIỆT ADMIN VÀ CLIENT
-  // ==========================================================
   
   // 1. Giao diện tối giản khi đang ở trang ADMIN
   if (pathname?.startsWith('/admin')) {
@@ -157,7 +165,7 @@ export default function Header() {
       <header className="site-header shadow-sm">
         <div className="container header-inner d-flex align-items-center justify-content-between">
           {/* LOGO */}
-          <Link href="/" className="logo d-flex align-items-center text-decoration-none">
+          <Link href="/home" className="logo d-flex align-items-center text-decoration-none">
             <img src="/image/logo chinh.jpg" alt="Pibook" className="logo-img" />
             <span className="brand-name"></span>
           </Link>
@@ -295,8 +303,8 @@ export default function Header() {
         /* ✨ ĐÃ CHỈNH: Hover màu VÀNG cho NAV links */
         .header-nav .nav-link:hover,
         .header-nav .nav-link:focus { 
-          background: #ffc107 !important; /* Đổi thành màu vàng Bootstrap */
-          color: #2c3e50 !important;     /* Đổi thành màu đen/tối để dễ đọc */
+          background: #ef4444 !important; 
+          color: #FFFF00 !important;     
           transform: translateY(-2px);
         }
         

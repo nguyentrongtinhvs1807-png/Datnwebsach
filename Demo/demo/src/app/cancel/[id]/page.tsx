@@ -1,103 +1,130 @@
+// app/cancel/[id]/page.tsx
 "use client";
-import React, { useState } from "react";
-import { Container, Form, Button, Card } from "react-bootstrap";
-import { useRouter } from "next/navigation";
 
-const CancelOrder: React.FC = () => {
+import { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { toast } from "react-toastify";
+
+const REASONS = [
+  "Tôi đã đặt nhầm sản phẩm",
+  "Tôi tìm được giá rẻ hơn ở nơi khác",
+  "Thời gian giao hàng quá lâu",
+  "Tôi muốn thay đổi địa chỉ giao hàng",
+  "Tôi không còn nhu cầu mua nữa",
+];
+
+export default function CancelOrderPage() {
   const router = useRouter();
+  const params = useParams();
+const id = params?.id as string; // ép kiểu an toàn
+// hoặc nếu id có thể là mảng (rất hiếm): 
+// const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [selectedReason, setSelectedReason] = useState("");
-  const [customReason, setCustomReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
 
-  const cancelReasons = [
-    "Tôi đã đặt nhầm sản phẩm",
-    "Tôi tìm được giá rẻ hơn ở nơi khác",
-    "Thời gian giao hàng quá lâu",
-    "Tôi muốn thay đổi địa chỉ giao hàng",
-    "Tôi không còn nhu cầu mua nữa",
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const reasonToSend = customReason || selectedReason;
-
-    if (!reasonToSend) {
-      alert("Vui lòng chọn hoặc nhập lý do huỷ đơn.");
+  const handleCancel = async () => {
+    if (!selectedReason && !otherReason.trim()) {
+      toast.error("Vui lòng chọn hoặc nhập lý do hủy đơn!");
       return;
     }
 
-    // 🚀 Gửi API huỷ đơn ở đây
-    console.log("Lý do huỷ:", reasonToSend);
+    const reason = selectedReason === "other" ? otherReason.trim() : selectedReason;
 
-    alert("Đơn hàng đã được huỷ thành công!");
-    router.push("/orders"); // Quay lại trang danh sách đơn hàng
+    try {
+      const res = await fetch(`http://localhost:3003/orders/${id}/cancel`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ly_do_huy: reason }),
+      });
+
+      if (res.ok) {
+        toast.success("Hủy đơn hàng thành công! Admin sẽ sớm xử lý.");
+        setTimeout(() => router.push("/orders"), 2000);
+      } else {
+        toast.error("Hủy đơn thất bại, vui lòng thử lại!");
+      }
+    } catch {
+      toast.error("Lỗi kết nối, vui lòng thử lại!");
+    }
   };
 
   return (
-    <Container className="mt-5" style={{ maxWidth: "700px" }}>
-      <Card className="shadow-sm border-0 rounded-4 p-4">
-        <h3 className="text-center mb-4 fw-bold" style={{ color: "#ff5722" }}>
-          Huỷ đơn hàng
-        </h3>
+    <div className="container py-5">
+      <div className="row justify-content-center">
+        <div className="col-lg-6">
+          <div className="card shadow-lg border-0 rounded-4">
+            <div className="card-body p-5">
+              <h2 className="text-center fw-bold mb-4" style={{ color: "#e74c3c" }}>
+                Hủy đơn hàng
+              </h2>
+              <p className="text-center text-muted mb-5">
+                Đơn hàng <strong className="text-primary">#PIBOOK-{id}</strong>
+              </p>
 
-        <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-4">
-            <Form.Label className="fw-semibold">Chọn lý do huỷ:</Form.Label>
-            {cancelReasons.map((reason, idx) => (
-              <Form.Check
-                key={idx}
-                type="radio"
-                id={`reason-${idx}`}
-                name="cancelReason"
-                label={reason}
-                value={reason}
-                checked={selectedReason === reason}
-                onChange={(e) => setSelectedReason(e.target.value)}
-                className="mb-2"
-              />
-            ))}
-          </Form.Group>
+              <div className="mb-4">
+                <label className="form-label fw-bold">Chọn lý do hủy:</label>
+                {REASONS.map((reason) => (
+                  <div key={reason} className="form-check mb-3">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="reason"
+                      id={reason}
+                      value={reason}
+                      checked={selectedReason === reason}
+                      onChange={(e) => setSelectedReason(e.target.value)}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <label className="form-check-label" htmlFor={reason} style={{ cursor: "pointer" }}>
+                      {reason}
+                    </label>
+                  </div>
+                ))}
 
-          <Form.Group className="mb-4">
-            <Form.Label className="fw-semibold">Lý do khác (tùy chọn):</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              placeholder="Nhập lý do khác..."
-              value={customReason}
-              onChange={(e) => setCustomReason(e.target.value)}
-            />
-          </Form.Group>
+                <div className="form-check mb-3">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    name="reason"
+                    id="other"
+                    value="other"
+                    checked={selectedReason === "other"}
+                    onChange={(e) => setSelectedReason(e.target.value)}
+                  />
+                  <label className="form-check-label" htmlFor="other">
+                    Lý do khác
+                  </label>
+                </div>
 
-          <div className="d-flex justify-content-center gap-3">
-            <Button
-              variant="secondary"
-              type="button"
-              className="px-4"
-              onClick={() => router.push("/orders")}
-            >
-              Quay lại
-            </Button>
+                {selectedReason === "other" && (
+                  <textarea
+                    className="form-control mt-3"
+                    rows={4}
+                    placeholder="Nhập lý do khác..."
+                    value={otherReason}
+                    onChange={(e) => setOtherReason(e.target.value)}
+                  />
+                )}
+              </div>
 
-            <Button
-              variant="danger"
-              type="submit"
-              className="px-4"
-              style={{
-                backgroundColor: "#ff5722",
-                border: "none",
-                transition: "0.3s",
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#e64a19")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#ff5722")}
-            >
-              Xác nhận huỷ
-            </Button>
+              <div className="d-flex gap-3 justify-content-center mt-5">
+                <button
+                  className="btn btn-secondary btn-lg px-5 rounded-pill"
+                  onClick={() => router.push("/orders")}
+                >
+                  Quay lại
+                </button>
+                <button
+                  className="btn btn-danger btn-lg px-5 rounded-pill shadow"
+                  onClick={handleCancel}
+                >
+                  Xác nhận hủy
+                </button>
+              </div>
+            </div>
           </div>
-        </Form>
-      </Card>
-    </Container>
+        </div>
+      </div>
+    </div>
   );
-};
-
-export default CancelOrder;
+}

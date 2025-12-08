@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-// Đã thay thế Link của Next.js bằng thẻ <a> HTML tiêu chuẩn
-// Đã thay thế useRouter bằng window.location.href (để mô phỏng định tuyến)
-// Đã thay thế FaSearch bằng SVG nội tuyến
+
 
 interface Book {
   sach_id: number;
@@ -17,69 +15,113 @@ interface Book {
   loai_bia: string;
   Loai_sach_id: number;
   image?: string | null;
+  an_hien?: number;
 }
 
-// Dữ liệu chuẩn cho cart/checkout
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  quantity: number;
-}
+
+const PRODUCTS_PER_PAGE = 12;
+
+
+
+const buttonBaseStyle = {
+  width: "50px",
+  height: "50px",
+  borderRadius: "10px", 
+  border: "none",
+  padding: "0",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexGrow: 1, 
+};
+
+const viewButtonStyle = {
+  ...buttonBaseStyle,
+  background: "#93c5fd", 
+  color: "#1e40af", 
+};
+
+const buyButtonStyle = {
+  ...buttonBaseStyle,
+  background: "#fcd34d", 
+  color: "#92400e", 
+};
+
+const cartButtonStyle = {
+  ...buttonBaseStyle,
+  background: "#6ee7b7", 
+  color: "#047857", 
+};
+// =========================================================================
+
 
 export default function ProductList() {
-  // Loại bỏ useRouter do không khả dụng trong môi trường này
-  // const router = useRouter(); 
-
   const [books, setBooks] = useState<Book[]>([]);
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("");
-  const [visibleCount, setVisibleCount] = useState(8);
+  
+  // THAY ĐỔI: Chuyển từ visibleCount sang currentPage
+  const [currentPage, setCurrentPage] = useState(1); 
 
   // Bộ lọc
   const [selectedAuthors, setSelectedAuthors] = useState<string[]>([]);
   const [selectedPublishers, setSelectedPublishers] = useState<string[]>([]);
-  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [selectedBookTypes, setSelectedBookTypes] = useState<string[]>([]);
 
-  // Gọi API
   useEffect(() => {
+    // Logic Fetch sách và tìm kiếm từ URL/Header
+    const savedQuery = sessionStorage.getItem("searchQueryFromHeader");
+    if (savedQuery) {
+      setSearch(savedQuery);
+      sessionStorage.removeItem("searchQueryFromHeader");
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const urlQuery = params.get("q");
+    if (urlQuery) setSearch(decodeURIComponent(urlQuery));
+
+    // Fetch sách
     fetch("http://localhost:3003/books")
       .then((res) => res.json())
-      .then((data: unknown) => {
+      .then((data: any) => {
         if (Array.isArray(data)) {
-          const uniqueBooks = Array.from(
-            new Map(data.map((b: any) => [b.sach_id, b])).values()
-          ) as Book[];
-          setBooks(uniqueBooks);
-        } else {
-          console.error("❌ API /books không trả về mảng hợp lệ:", data);
-          setBooks([]);
+          const unique = Array.from(new Map(data.map((b: any) => [b.sach_id, b])).values()) as Book[];
+      
+          // LỌC SÁCH ĐÃ BỊ ẨN (an_hien = 0)
+          const visibleBooks = unique.filter(book => book.an_hien !== 0);
+      
+          setBooks(visibleBooks);
         }
       })
-      .catch((err) => console.error("❌ Lỗi khi gọi API:", err));
-  }, []);
+      .catch((err) => console.error(err));
+      
+    // Quan trọng: Khi filter/search thay đổi, quay về trang 1
+    setCurrentPage(1); 
+  }, []); // Cần thêm search, selectedAuthors, selectedPublishers, selectedBookTypes vào dependency array nếu bạn muốn reset trang khi filter thay đổi.
 
-  const uniqueAuthors = Array.from(new Set(books.map((b) => b.ten_tac_gia).filter(Boolean))).sort();
-  const uniquePublishers = Array.from(new Set(books.map((b) => b.ten_NXB).filter(Boolean))).sort();
-  const uniqueBookTypes = Array.from(new Set(books.map((b) => b.loai_bia).filter(Boolean))).sort();
-  const suppliers = ["Pibbok"];
+  // Khi bộ lọc thay đổi, reset về trang 1
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedAuthors, selectedPublishers, selectedBookTypes, sortOrder]);
 
-  const toggleFilter = (setter: Function, current: string[], value: string) => {
-    setter(current.includes(value) ? current.filter((v) => v !== value) : [...current, value]);
+
+  const uniqueAuthors = Array.from(new Set(books.map((b) => b.ten_tac_gia))).sort();
+  const uniquePublishers = Array.from(new Set(books.map((b) => b.ten_NXB))).sort();
+  const uniqueBookTypes = Array.from(new Set(books.map((b) => b.loai_bia))).sort();
+
+  const toggleFilter = (setter: Function, arr: string[], val: string) => {
+    setter(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
   };
 
   const filteredBooks = books
     .filter((b) => {
-      const matchesSearch =
+      const matchSearch =
         b.ten_sach.toLowerCase().includes(search.toLowerCase()) ||
         b.ten_tac_gia.toLowerCase().includes(search.toLowerCase());
-      if (!matchesSearch) return false;
-      if (selectedAuthors.length > 0 && !selectedAuthors.includes(b.ten_tac_gia)) return false;
-      if (selectedPublishers.length > 0 && !selectedPublishers.includes(b.ten_NXB)) return false;
-      if (selectedBookTypes.length > 0 && !selectedBookTypes.includes(b.loai_bia)) return false;
-      if (selectedSuppliers.length > 0 && !selectedSuppliers.includes("Pibbok")) return false;
+      if (!matchSearch) return false;
+      if (selectedAuthors.length && !selectedAuthors.includes(b.ten_tac_gia)) return false;
+      if (selectedPublishers.length && !selectedPublishers.includes(b.ten_NXB)) return false;
+      if (selectedBookTypes.length && !selectedBookTypes.includes(b.loai_bia)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -88,284 +130,372 @@ export default function ProductList() {
       return 0;
     });
 
-  const visibleBooks = filteredBooks.slice(0, visibleCount);
+  // LOGIC PHÂN TRANG MỚI
+  const totalPages = Math.ceil(filteredBooks.length / PRODUCTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const endIndex = startIndex + PRODUCTS_PER_PAGE;
+  
+  // THAY ĐỔI: Lấy sách chỉ trong trang hiện tại
+  const visibleBooks = filteredBooks.slice(startIndex, endIndex); 
 
-  const formatPrice = (price: number) => Math.round(price).toLocaleString("vi-VN") + "₫";
+  const formatPrice = (price: number) => Math.round(price).toLocaleString("vi-VN") + "đ";
 
-  // 🔧 Chuẩn hóa dữ liệu sản phẩm để lưu vào cart/checkout
-  const normalizeBook = (b: Book): CartItem => {
-    const gia = Number(b.gia_sach) || 0;
-    const giam = Number(b.gg_sach) || 0;
-    const price = Math.max(gia - giam, 0);
-    return {
-      id: b.sach_id.toString(),
-      name: b.ten_sach,
-      price,
-      image: b.image || "/image/default-book.jpg",
-      quantity: 1,
-    };
-  };
+  // Hàm xử lý Pagination (Giả định sử dụng React-Bootstrap Pagination hoặc tự làm)
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
 
-  // 🛒 Thêm vào giỏ hàng (ĐÃ CHỈNH SỬA)
-  const handleAddToCart = (b: Book) => {
-    const cart: CartItem[] = JSON.parse(localStorage.getItem("cart") || "[]");
-    const existing = cart.find((item) => item.id === b.sach_id.toString());
-    
-    if (existing) {
-      existing.quantity += 1;
-    } else {
-      cart.push(normalizeBook(b));
+    const items = [];
+    const maxPageDisplay = 5; // Hiển thị tối đa 5 nút trang
+    let startPage = Math.max(1, currentPage - Math.floor(maxPageDisplay / 2));
+    let endPage = Math.min(totalPages, startPage + maxPageDisplay - 1);
+
+    if (endPage - startPage + 1 < maxPageDisplay) {
+        startPage = Math.max(1, endPage - maxPageDisplay + 1);
+    }
+
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <li key={i} className={`page-item ${i === currentPage ? 'active' : ''}`}>
+          <a 
+            className="page-link shadow-sm fw-bold" 
+            href="#" 
+            onClick={(e) => {
+              e.preventDefault();
+              setCurrentPage(i);
+              window.scrollTo({ top: 0, behavior: 'smooth' }); // Cuộn lên đầu trang
+            }}
+            style={{ 
+              background: i === currentPage ? "#fcd34d" : "#fff", // Màu vàng tươi cho trang hiện tại
+              borderColor: i === currentPage ? "#fcd34d" : "#dee2e6",
+              color: i === currentPage ? "#92400e" : "#000",
+            }}
+          >
+            {i}
+          </a>
+        </li>
+      );
     }
     
+    return (
+      <nav aria-label="Product Page Navigation" className="mt-5">
+        <ul className="pagination justify-content-center">
+          
+          <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+            <a className="page-link" href="#" aria-label="Previous" onClick={(e) => { e.preventDefault(); if (currentPage > 1) setCurrentPage(currentPage - 1); }}>
+              <span aria-hidden="true">&laquo;</span>
+            </a>
+          </li>
+
+          {items}
+          
+          <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+            <a className="page-link" href="#" aria-label="Next" onClick={(e) => { e.preventDefault(); if (currentPage < totalPages) setCurrentPage(currentPage + 1); }}>
+              <span aria-hidden="true">&raquo;</span>
+            </a>
+          </li>
+
+        </ul>
+      </nav>
+    );
+  };
+  
+  // Các hàm handleAddToCart và handleBuyNow (Giữ nguyên)
+  const handleAddToCart = (book: Book) => {
+    // ... logic giữ nguyên
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const exist = cart.find((x: any) => x.id === book.sach_id.toString());
+
+    if (exist) exist.quantity += 1;
+    else {
+      cart.push({
+        id: book.sach_id.toString(),
+        name: book.ten_sach,
+        price: book.gia_sach - book.gg_sach,
+        image: book.image || "/image/default-book.jpg",
+        quantity: 1,
+      });
+    }
+
     localStorage.setItem("cart", JSON.stringify(cart));
-    
-    // **QUAN TRỌNG:** Xóa thông tin mua ngay (checkoutItem)
-    // để đảm bảo trang checkout sẽ lấy dữ liệu từ giỏ hàng (cart)
-    localStorage.removeItem("checkoutItem"); 
-    
-    // Thay alert bằng thông báo không chặn (Non-blocking notification)
-    const notification = document.createElement('div');
-    notification.textContent = `✅ Đã thêm "${b.ten_sach}" vào giỏ hàng!`;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #28a745;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        z-index: 9999;
-        font-weight: bold;
-        transition: opacity 0.5s ease-out;
-    `;
-    document.body.appendChild(notification);
-    
+    window.dispatchEvent(new Event("cart-update"));
+
+    const toast = document.createElement("div");
+    toast.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Đã thêm <strong>"${book.ten_sach}"</strong> vào giỏ hàng!`;
+    Object.assign(toast.style, {
+      position: "fixed",
+      top: "20px",
+      right: "20px",
+      background: "linear-gradient(135deg, #10b981, #059669)",
+      color: "white",
+      padding: "16px 24px",
+      borderRadius: "16px",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+      zIndex: 9999,
+      fontWeight: "bold",
+      fontSize: "1rem",
+      display: "flex",
+      alignItems: "center",
+      animation: "slideIn 0.4s ease",
+    });
+    document.body.appendChild(toast);
     setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => notification.remove(), 500);
-    }, 2000);
-    
-    // Gửi sự kiện cập nhật giỏ hàng để Header cập nhật huy hiệu
-    window.dispatchEvent(new Event('cart-update'));
+      toast.style.opacity = "0";
+      toast.style.transform = "translateX(100%)";
+      setTimeout(() => toast.remove(), 500);
+    }, 2500);
   };
 
-  // ⚡ Mua ngay
-  const handleBuyNow = (b: Book) => {
-    const checkoutItem = [normalizeBook(b)];
-    localStorage.setItem("checkoutItem", JSON.stringify(checkoutItem));
-    // Thay thế router.push bằng cách gán URL
+  const handleBuyNow = (book: Book) => {
+    // ... logic giữ nguyên
+    const item = {
+      id: book.sach_id.toString(),
+      name: book.ten_sach,
+      price: book.gia_sach - book.gg_sach,
+      image: book.image || "/image/default-book.jpg",
+      quantity: 1,
+    };
+    localStorage.setItem("checkoutItems", JSON.stringify([item]));
     window.location.href = "/checkout";
   };
 
-  return (
-    <div className="container py-5" style={{ minHeight: "100vh", background: "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)" }}>
-      {/* HEADER */}
-      <div className="mb-5 text-center">
-        <h1 className="fw-bold mb-2" style={{ letterSpacing: 2, fontSize: "2.8rem", color: "#d35400", textShadow: "2px 4px 10px rgba(241,196,15,0.09)" }}>
-          Khám Phá Kho Sách
-        </h1>
-        <p className="lead" style={{ color: "#616161", maxWidth: 600, margin: "0 auto" }}>
-          Nơi hội tụ những cuốn sách, tri thức và cảm hứng bất tận dành cho bạn!
-        </p>
-      </div>
 
-      {/* Thanh tìm kiếm + sắp xếp */}
-      <div className="card p-4 mb-4 shadow-lg border-0" style={{ borderRadius: "28px", background: "rgba(255,255,255,0.98)", backdropFilter: "blur(2px)" }}>
-        <div className="row g-3 justify-content-center align-items-center">
-          <div className="col-md-6">
-            <div className="input-group shadow-sm" style={{ borderRadius: "30px" }}>
-              {/* Thay thế FaSearch bằng SVG nội tuyến */}
-              <span className="input-group-text bg-white border-0" style={{ borderRadius: "30px 0 0 30px", fontSize: "1.4rem", color: "#f39c12" }}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="20" height="20" fill="currentColor"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.1-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+  return (
+    <>
+      <div className="container py-5" style={{ background: "linear-gradient(135deg, #fff8e1 0%, #fed7aa 100%)", minHeight: "100vh" }}>
+        {/* Header */}
+        <div className="text-center mb-5 pt-4">
+          <h1 className="fw-bold display-5" style={{ color: "#d97706" }}>
+            Kho Sách Pibbok Nơi Khỏi Đầu Của Thành Công 
+          </h1>
+          
+        </div>
+        
+        {/* Tìm kiếm + Sắp xếp (Giữ nguyên) */}
+        {/* Tìm kiếm + Sắp xếp */}
+        <div className="row justify-content-center mb-5">
+          <div className="col-lg-8">
+            <div className="input-group shadow-lg" style={{ borderRadius: "50px", overflow: "hidden" }}>
+              <span className="input-group-text bg-white border-0">
+                <i className="bi bi-search text-warning fs-4"></i>
               </span>
               <input
                 type="text"
-                placeholder="Tìm sách hoặc tác giả..."
+                className="form-control border-0 py-3 fs-5"
+                placeholder="Tìm tên sách, tác giả..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="form-control border-0"
-                style={{ borderRadius: "0 30px 30px 0", fontSize: "1.1rem", background: "#fafafa" }}
+                style={{ boxShadow: "none" }}
               />
             </div>
           </div>
-          <div className="col-md-3">
+          <div className="col-lg-3 mt-3 mt-lg-0">
             <select
+              // THAY ĐỔI: Thêm class py-3 để khớp với padding của ô tìm kiếm
+              className="form-select form-select-lg shadow py-3" 
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
-              className="form-select shadow-sm"
-              style={{ borderRadius: "30px", border: "1.7px solid #f9bf3b" }}
+              style={{ borderRadius: "30px" }}
             >
-              <option value="">-- Sắp xếp theo giá --</option>
-              <option value="asc">Giá tăng dần</option>
-              <option value="desc">Giá giảm dần</option>
+              <option value="">Sắp xếp theo giá</option>
+              <option value="asc"> Thấp đến Cao</option>
+              <option value="desc">Cao đến Thấp</option>
             </select>
           </div>
         </div>
-      </div>
 
-      <div className="row gx-4 gy-5">
-        {/* Cột lọc */}
-        <div className="col-lg-3 col-md-4 mb-4">
-          <div className="card border-0 shadow-lg" style={{ borderRadius: "20px", background: "rgba(255,255,255,0.98)", position: "sticky", top: "20px" }}>
-            <div className="card-body p-4">
-              <h5 className="fw-bold mb-4 text-center" style={{ color: "#d35400" }}>Bộ Lọc</h5>
+        <div className="row g-4">
+          {/* Bộ lọc bên trái (Giữ nguyên) */}
+          <div className="col-lg-3">
+            <div className="card border-0 shadow-lg sticky-top" style={{ top: "20px", borderRadius: "20px" }}>
+              <div className="card-body p-4">
+                <h5 className="fw-bold text-center mb-4 text-warning">Bộ Lọc</h5>
 
-              {/* Tác giả */}
-              <div className="mb-4 border-bottom pb-3">
-                <h6 className="fw-bold mb-2">Tác giả</h6>
-                {uniqueAuthors.slice(0, 5).map((a) => (
-                  <div key={a} className="form-check mb-1">
-                    <input className="form-check-input" type="checkbox" checked={selectedAuthors.includes(a)} onChange={() => toggleFilter(setSelectedAuthors, selectedAuthors, a)} />
-                    <label className="form-check-label">{a}</label>
-                  </div>
-                ))}
+                {["Tác giả", "Nhà xuất bản", "Loại bìa"].map((title, i) => {
+                  const data = i === 0 ? uniqueAuthors : i === 1 ? uniquePublishers : uniqueBookTypes;
+                  const setter = i === 0 ? setSelectedAuthors : i === 1 ? setSelectedPublishers : setSelectedBookTypes;
+                  const selected = i === 0 ? selectedAuthors : i === 1 ? selectedPublishers : selectedBookTypes;
+
+                  return (
+                    <div key={title} className="mb-4">
+                      <h6 className="fw-bold text-dark">{title}</h6>
+                      {data.slice(0, 6).map((item) => (
+                        <div className="form-check" key={item}>
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={selected.includes(item)}
+                            onChange={() => toggleFilter(setter, selected, item)}
+                          />
+                          <label className="form-check-label small">{item}</label>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+
+                {(selectedAuthors.length + selectedPublishers.length + selectedBookTypes.length) > 0 && (
+                  <button
+                    className="btn btn-outline-danger w-100 rounded-pill"
+                    onClick={() => {
+                      setSelectedAuthors([]);
+                      setSelectedPublishers([]);
+                      setSelectedBookTypes([]);
+                    }}
+                  >
+                    Xóa bộ lọc
+                  </button>
+                )}
               </div>
-
-              {/* Nhà xuất bản */}
-              <div className="mb-4 border-bottom pb-3">
-                <h6 className="fw-bold mb-2">Nhà xuất bản</h6>
-                {uniquePublishers.slice(0, 5).map((p) => (
-                  <div key={p} className="form-check mb-1">
-                    <input className="form-check-input" type="checkbox" checked={selectedPublishers.includes(p)} onChange={() => toggleFilter(setSelectedPublishers, selectedPublishers, p)} />
-                    <label className="form-check-label">{p}</label>
-                  </div>
-                ))}
-              </div>
-
-              {/* Loại bìa */}
-              <div className="mb-4 border-bottom pb-3">
-                <h6 className="fw-bold mb-2">Loại bìa</h6>
-                {uniqueBookTypes.map((t) => (
-                  <div key={t} className="form-check mb-1">
-                    <input className="form-check-input" type="checkbox" checked={selectedBookTypes.includes(t)} onChange={() => toggleFilter(setSelectedBookTypes, selectedBookTypes, t)} />
-                    <label className="form-check-label">{t}</label>
-                  </div>
-                ))}
-              </div>
-
-              {/* Nhà cung cấp */}
-              <div className="mb-4">
-                <h6 className="fw-bold mb-2">Nhà cung cấp</h6>
-                {suppliers.map((s) => (
-                  <div key={s} className="form-check mb-1">
-                    <input className="form-check-input" type="checkbox" checked={selectedSuppliers.includes(s)} onChange={() => toggleFilter(setSelectedSuppliers, selectedSuppliers, s)} />
-                    <label className="form-check-label">{s}</label>
-                  </div>
-                ))}
-              </div>
-
-              {(selectedAuthors.length || selectedPublishers.length || selectedBookTypes.length || selectedSuppliers.length) > 0 && (
-                <button className="btn btn-warning w-100 fw-bold" onClick={() => {
-                  setSelectedAuthors([]);
-                  setSelectedPublishers([]);
-                  setSelectedBookTypes([]);
-                  setSelectedSuppliers([]);
-                }} style={{ borderRadius: "30px" }}>Xóa bộ lọc</button>
-              )}
             </div>
           </div>
-        </div>
 
-        {/* Danh sách sách */}
-        <div className="col-lg-9 col-md-8">
-          <div className="row gx-4 gy-5">
-            {visibleBooks.map((b) => (
-              <div className="col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch" key={b.sach_id}>
-                <div className="card border-0 shadow-lg position-relative product-card d-flex flex-column w-100" style={{ borderRadius: "22px", minHeight: "520px", background: "linear-gradient(120deg,#fffbe8 80%,#fff6e9 100%)", overflow: "visible", transition: "transform 0.24s cubic-bezier(.2,.68,.37,.98), box-shadow 0.22s" }}>
-                  
-                  {/* Ưu đãi */}
-                  
+          {/* Danh sách sách */}
+          <div className="col-lg-9">
+            <div className="row g-4">
+              {visibleBooks.map((book) => {
+                const hasDiscount = book.gg_sach > 0;
+                const finalPrice = hasDiscount ? book.gia_sach - book.gg_sach : book.gia_sach;
 
-                  {/* Hình ảnh (ĐÃ BIẾN THÀNH THẺ <a> HTML) */}
-                  <a href={`/products/${b.sach_id}`} style={{ 
-                      width: "100%", 
-                      height: "240px", 
-                      background: "linear-gradient(135deg, #f5f6fa 65%, #e5ecfa 100%)", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "center", 
-                      borderTopLeftRadius: "22px", 
-                      borderTopRightRadius: "22px",
-                      cursor: "pointer", // Thêm cursor pointer để người dùng nhận biết được là link
-                      textDecoration: "none"
-                  }}>
-                    <img src={b.image || "/image/default-book.jpg"} alt={b.ten_sach} style={{ maxHeight: "96%", maxWidth: "70%", objectFit: "contain" }} />
-                  </a>
-                  {/* END Hình ảnh */}
+                return (
+                  <div className="col-6 col-md-4 col-lg-4 col-xl-3" key={book.sach_id}>
+                    <div
+                      className="card border-0 shadow-sm h-100 rounded-4 overflow-hidden position-relative"
+                      style={{
+                        background: "#fff9e6",
+                        transition: "all 0.35s ease",
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-12px)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                      onClick={() => (window.location.href = `/products/${book.sach_id}`)}
+                    >
+                      {/* Ảnh + Badge (Giữ nguyên đã bóp nhỏ) */}
+                      <div className="position-relative">
+                        <img
+                          src={book.image || "/image/default-book.jpg"}
+                          alt={book.ten_sach}
+                          style={{
+                            height: "200px", 
+                            width: "100%",
+                            objectFit: "contain",
+                            padding: "20px",
+                            background: "white",
+                          }}
+                        />
+                        {hasDiscount && (
+                          <span
+                            className="position-absolute top-0 end-0 m-3 badge rounded-pill text-white fw-bold shadow-lg"
+                            style={{
+                              fontSize: "1rem",
+                              padding: "10px 16px",
+                              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                            }}
+                          >
+                            -{Math.round((book.gg_sach / book.gia_sach) * 100)}%
+                          </span>
+                        )}
+                      </div>
 
-                  {/* Nội dung */}
-                  <div className="card-body text-center px-3 py-3 d-flex flex-column justify-content-between flex-grow-1">
-                    <div>
-                      <h6 className="fw-bold mb-1 text-truncate">{b.ten_sach}</h6>
-                      <p className="fw-medium mb-1 text-secondary text-truncate">{b.ten_tac_gia}</p>
-                    </div>
+                      {/* Card Body (Giữ nguyên đã bóp nhỏ) */}
+                      <div className="card-body d-flex flex-column p-3 text-center"> 
+                        <h6 
+                          className="fw-bold mb-2" 
+                          style={{ 
+                            height: "40px", 
+                            overflow: "hidden", 
+                            fontSize: "1.05rem" 
+                          }}
+                        >
+                          {book.ten_sach}
+                        </h6>
 
-                    {/* Giá */}
-                    <div>
-                      {b.gg_sach > 0 ? (
-                        <div className="mb-1">
-                          <span className="text-decoration-line-through text-muted small me-1">{formatPrice(b.gia_sach)}</span>
-                          <span className="fw-bold fs-5 text-danger">{formatPrice(b.gia_sach - b.gg_sach)}</span>
+                        {/* TÊN TÁC GIẢ MÀU XANH LÁ ĐẸP */}
+                        <p 
+                          className="fw-semibold mb-2" 
+                          style={{ 
+                            color: "#059669", 
+                            fontSize: "0.98rem" 
+                          }}
+                        >
+                          {book.ten_tac_gia}
+                        </p>
+
+                        {/* Giá */}
+                        {hasDiscount ? (
+                          <>
+                            <h5 className="text-danger fw-bold">{formatPrice(finalPrice)}</h5>
+                            <del className="text-muted small">{formatPrice(book.gia_sach)}</del>
+                          </>
+                        ) : (
+                          <h5 className="text-primary fw-bold">{formatPrice(book.gia_sach)}</h5>
+                        )}
+
+                        {/* 3 NÚT ICON (Giữ nguyên) */}
+                        <div className="d-flex justify-content-center gap-3 mt-3"> 
+                          <button
+                            className="btn shadow-sm fw-bold p-2"
+                            style={viewButtonStyle}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/products/${book.sach_id}`;
+                            }}
+                            title="Xem chi tiết"
+                          >
+                            <i className="bi bi-search fs-5"></i> 
+                          </button>
+
+                          <button
+                            className="btn shadow-sm fw-bold p-2"
+                            style={buyButtonStyle}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBuyNow(book);
+                            }}
+                            title="Mua ngay"
+                          >
+                            <i className="bi bi-lightning-fill fs-5"></i> 
+                          </button>
+
+                          <button
+                            className="btn shadow-sm fw-bold p-2"
+                            style={cartButtonStyle}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToCart(book);
+                            }}
+                            title="Thêm vào giỏ"
+                          >
+                            <i className="bi bi-cart-plus-fill fs-5"></i>
+                          </button>
                         </div>
-                      ) : (
-                        <div className="mb-1"><span className="fw-bold fs-5 text-danger">{formatPrice(b.gia_sach)}</span></div>
-                      )}
-                    </div>
-
-                    {/* Nút */}
-                    <div className="d-flex flex-column gap-2 mt-2">
-                      {/* Thay thế Link bằng <a> */}
-                      <a href={`/products/${b.sach_id}`} className="btn fw-bold shadow-sm" style={{ borderRadius: "30px", background: "linear-gradient(90deg,#f7ca57 20%,#efb14e 100%)", border: "none", color: "white" }}>Xem chi tiết</a>
-
-                      <button
-                        onClick={() => handleAddToCart(b)}
-                        className="btn fw-bold shadow-sm"
-                        style={{ borderRadius: "30px", background: "linear-gradient(90deg,#58d68d,#28b463)", border: "none", color: "white" }}
-                      >
-                        Thêm vào giỏ hàng
-                      </button>
-
-                      <button
-                        onClick={() => handleBuyNow(b)}
-                        className="btn fw-bold shadow-sm"
-                        style={{ borderRadius: "30px", background: "linear-gradient(90deg,#f06292,#e84393)", border: "none", color: "white" }}
-                      >
-                        Mua ngay
-                      </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
+
+            {/* THAY THẾ NÚT XEM THÊM BẰNG PHÂN TRANG */}
+            {visibleBooks.length > 0 && renderPagination()}
 
             {visibleBooks.length === 0 && (
-              <div className="col-12 text-center mt-5 py-5">
-                <p className="text-muted fs-5">Không có sách nào phù hợp với tìm kiếm hoặc bộ lọc của bạn.</p>
+              <div className="text-center py-5">
+                <i className="bi bi-emoji-frown fs-1 text-muted mb-3"></i>
+                <p className="fs-4 text-muted">Không tìm thấy sách nào</p>
               </div>
             )}
           </div>
-
-          {visibleCount < filteredBooks.length && (
-            <div className="text-center mt-4">
-              <button
-                className="btn btn-lg py-2 px-5 fw-bold shadow-lg"
-                style={{ borderRadius: "40px", background: "linear-gradient(90deg, #f7ca57, #efb14e)", border: "none", color: "white" }}
-                onClick={() => setVisibleCount((prev) => prev + 8)}
-              >
-                Xem thêm sách
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
-      <style>{`
-        .product-card:hover {
-          transform: translateY(-9px) scale(1.024);
-          box-shadow: 0 12px 38px #f7ca5749;
+      {/* CSS Animation */}
+      <style jsx>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
         }
       `}</style>
-    </div>
+    </>
   );
 }

@@ -48,7 +48,7 @@ const Footer = () => {
               <li><a href="#" className="text-light text-decoration-none">Giỏ hàng</a></li>
               <li><a href="#" className="text-light text-decoration-none">Lịch sử giao dịch</a></li>
               <li><a href="#" className="text-light text-decoration-none">Sản phẩm yêu thích</a></li>
-<li><a href="orders" className="text-light text-decoration-none">Kiểm tra đơn hàng</a></li>
+             <li><a href="orders" className="text-light text-decoration-none">Kiểm tra đơn hàng</a></li>
             </ul>
           </div>
 

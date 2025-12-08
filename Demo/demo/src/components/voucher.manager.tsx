@@ -4,99 +4,54 @@ import { useEffect, useState } from "react";
 import { Table, Button, Form, Modal, Container, Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 
-interface Voucher {
-  id?: number;
-  code: string;
-  type: 'fixed' | 'percent'; 
-  discount: number;
-  min_order: number;
-  max_discount: number;
-  start_date: string; 
-  end_date: string;  
-  description?: string; 
-}
+const todayISOString = new Date().toISOString().split("T")[0];
 
-// ==============================================================================
-// 🛠️ HÀM XỬ LÝ DỮ LIỆU (GIỮ NGUYÊN)
-// ==============================================================================
-const cleanNumericString = (value: any): number => {
-    if (value === null || value === undefined) return 0;
-    if (typeof value === 'number') {
-        return isNaN(value) ? 0 : value;
-    }
-    let numericString = String(value).trim();
-    if (numericString === '') return 0;
-    numericString = numericString.replace(/[.,]/g, ''); 
-    numericString = numericString.replace(/[^0-9\-]/g, '');
-    numericString = numericString.replace(/00$/, ''); 
-    const num = Number(numericString);
-    return isNaN(num) ? 0 : num;
+const DateDisplay = ({ date }: { date: string | null }) => {
+  if (!date) return <span className="text-muted">-</span>;
+  const d = new Date(date);
+  return <>{isNaN(d.getTime()) ? "-" : d.toLocaleDateString("vi-VN")}</>;
 };
 
-const toMysqlDate = (dateStr?: string | null) => {
-  if (!dateStr) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+// Format an toàn, tự đoán loại từ dữ liệu
+const formatDiscount = (v: any) => {
+  const discount = Number(v.gia_tri_giam || v.discount || 0);
+  const type = v.loai_giam || v.type || "fixed";
   
-  try {
-    const dateInput = dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00'; 
-    const d = new Date(dateInput);
+  // Nếu discount nhỏ (≤100) và có max_discount → có thể là percent
+  const isPercent = (type === "percent" || (discount <= 100 && v.giam_toi_da > 0));
+  
+  return isPercent ? `${discount}%` : `${discount.toLocaleString("vi-VN")}đ`;
+};
 
-    if (isNaN(d.getTime())) return null;
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  } catch (e) {
-    return null;
+const formatMaxDiscount = (v: any) => {
+  const max = Number(v.giam_toi_da || v.max_discount || 0);
+  if (max > 0) {
+    return `${max.toLocaleString("vi-VN")}đ`;
   }
+  return "Không giới hạn";
 };
 
-const DateDisplay = ({ date }: { date: string }) => {
-  const [formattedDate, setFormattedDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      if (date && date.length >= 10) { 
-        const d = new Date(date.split('T')[0] + 'T00:00:00');
-        
-        if (isNaN(d.getTime())) {
-             setFormattedDate("-");
-        } else {
-             setFormattedDate(d.toLocaleDateString("vi-VN"));
-        }
-      } else {
-         setFormattedDate("-");
-      }
-    } catch (e) {
-      setFormattedDate("-");
-    }
-  }, [date]);
-
-  return formattedDate || "-";
-};
-
-const formatDiscount = (v: Voucher) => {
-    const value = v.discount || 0;
-    if (v.type === 'percent') {
-        return `${value.toLocaleString('vi-VN')}%`;
-    }
-    return `${value.toLocaleString('vi-VN')}đ`;
-};
-
-export default function AdminVoucherPage() {
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+export default function VoucherManager() {
+  const [vouchers, setVouchers] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
+  const [editingVoucher, setEditingVoucher] = useState<any | null>(null);
 
-  // 📦 Lấy danh sách voucher
   const fetchVouchers = async () => {
     try {
       const res = await fetch("http://localhost:3003/api/voucher");
+      if (!res.ok) throw new Error("Lỗi tải dữ liệu");
       const data = await res.json();
-      setVouchers(data);
+      
+      // DEBUG: In ra để xem cấu trúc thật
+      console.log("=== DEBUG VOUCHER DATA ===");
+      console.log("Raw data:", data);
+      console.log("First item:", data[0] || "No data");
+      console.log("=== END DEBUG ===");
+      
+      setVouchers(Array.isArray(data) ? data : []);
     } catch (err) {
-      toast.error("Lỗi khi tải voucher!");
-      console.error("❌ Lỗi khi tải voucher:", err);
+      console.error(err);
+      toast.error("Lỗi khi tải danh sách voucher!");
     }
   };
 
@@ -104,96 +59,89 @@ export default function AdminVoucherPage() {
     fetchVouchers();
   }, []);
 
-  // 💾 Lưu hoặc cập nhật voucher (Giữ nguyên)
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+  const getMaxAllowedDiscount = (): number => {
+    if (!editingVoucher || (editingVoucher.loai_giam || editingVoucher.type) !== "percent") return 0;
+    const minOrder = Number(editingVoucher.don_toi_thieu || editingVoucher.min_order || 0);
+    return Math.floor(minOrder * 0.5);
+  };
+
+  const openAddModal = () => {
+    setEditingVoucher({
+      code: "",
+      type: "percent",
+      discount: 10,
+      min_order: 0,
+      max_discount: 0,
+      start_date: todayISOString,
+      end_date: null,
+    });
+    setShowModal(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingVoucher) return;
-    // ... (logic handleSave giữ nguyên) ...
-    const method = editingVoucher.id ? "PUT" : "POST";
-    const url = "http://localhost:3003/api/voucher"; 
+    if (!editingVoucher) return toast.error("Lỗi hệ thống!");
 
-    const { code, type, discount, min_order, max_discount, start_date, end_date, id, description } = editingVoucher;
+    if (!editingVoucher.code?.trim()) return toast.error("Vui lòng nhập mã voucher!");
+    const discount = Number(editingVoucher.discount || editingVoucher.gia_tri_giam || 0);
+    if (discount <= 0) return toast.error("Giá trị giảm phải lớn hơn 0!");
+    const type = editingVoucher.type || editingVoucher.loai_giam || "fixed";
+    if (type === "percent" && discount > 100) return toast.error("Phần trăm giảm không được quá 100%!");
 
-    const voucherDataToSend: any = {
-        id, code, type, description,
-        discount: Number(discount) || 0,
-        min_order: Number(min_order) || 0,
-        max_discount: Number(max_discount) || 0,
-        start_date: toMysqlDate(start_date),
-        end_date: toMysqlDate(end_date),
+    const payload = {
+      id: editingVoucher.id,
+      code: editingVoucher.code?.trim().toUpperCase(),
+      type: type,
+      discount: discount,
+      min_order: Number(editingVoucher.min_order || editingVoucher.don_toi_thieu || 0),
+      max_discount: type === "percent" ? Number(editingVoucher.max_discount || editingVoucher.giam_toi_da || 0) : 0,
+      start_date: editingVoucher.start_date || editingVoucher.ngay_bd,
+      end_date: editingVoucher.end_date || editingVoucher.ngay_kt || null,
     };
 
-    if (!editingVoucher.id) delete voucherDataToSend.id;
-    if (!description) delete voucherDataToSend.description;
-
     try {
-      const res = await fetch(url, {
-        method,
+      const res = await fetch("http://localhost:3003/api/voucher", {
+        method: editingVoucher.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(voucherDataToSend),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.error || `Lưu voucher thất bại với mã ${res.status}`);
-      }
-
-      toast.success(
-        editingVoucher.id
-          ? "Cập nhật voucher thành công!"
-          : "Thêm voucher thành công!"
-      );
-
+      if (!res.ok) throw new Error("Lưu thất bại");
+      toast.success(editingVoucher.id ? "Cập nhật thành công!" : "Thêm voucher thành công!");
       setShowModal(false);
       setEditingVoucher(null);
       fetchVouchers();
-    } catch (err: any) {
-      toast.error(err.message || "Lỗi khi lưu voucher!");
-      console.error(err);
+    } catch {
+      toast.error("Lỗi khi lưu voucher!");
     }
   };
 
-  // 🗑️ Xoá voucher (Giữ nguyên)
   const handleDelete = async (id: number) => {
-    if (confirm("Bạn có chắc chắn muốn xoá voucher này?")) {
-      try {
-        await fetch(`http://localhost:3003/api/voucher/${id}`, { method: "DELETE" });
-        toast.success("Đã xoá voucher!");
-        fetchVouchers();
-      } catch (err) {
-        toast.error("Lỗi khi xoá voucher!");
-      }
+    if (!confirm("Bạn có chắc chắn muốn xóa voucher này?")) return;
+    try {
+      const res = await fetch(`http://localhost:3003/api/voucher/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Xóa thất bại");
+      toast.success("Đã xóa voucher!");
+      fetchVouchers();
+    } catch {
+      toast.error("Lỗi khi xóa!");
     }
   };
 
   return (
     <Container className="py-5">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="fw-bold mb-0" style={{ color: "#21409A", letterSpacing: ".5px" }}>
-          🎟️ Quản lý Voucher
+        <h2 className="fw-bold mb-0" style={{ color: "#21409A" }}>
+          Quản lý Voucher
         </h2>
         <Button
+          onClick={openAddModal}
           style={{
             background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)",
-            color: "#fff",
             border: "none",
-            borderRadius: "10px",
+            borderRadius: "12px",
+            padding: "10px 30px",
             fontWeight: 600,
-            padding: "10px 28px",
-            fontSize: "1.1em",
-          }}
-          onClick={() => {
-            setEditingVoucher({
-              code: "",
-              type: "percent", 
-              discount: 0,
-              min_order: 0,
-              max_discount: 0,
-              start_date: "",
-              end_date: "",
-              description: "",
-            });
-            setShowModal(true);
           }}
         >
           + Thêm Voucher
@@ -201,71 +149,75 @@ export default function AdminVoucherPage() {
       </div>
 
       <div className="table-responsive shadow-sm rounded-3 overflow-hidden">
-        <Table hover className="mb-0" style={{ minWidth: "900px" }}>
+        <Table hover className="mb-0">
           <thead style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}>
             <tr>
-              <th className="fw-semibold text-center">Mã</th>
-              <th className="fw-semibold text-center">Giảm</th> 
-              <th className="fw-semibold text-center">Đơn tối thiểu</th>
-              <th className="fw-semibold text-center">Giảm tối đa</th>
-              <th className="fw-semibold text-center">Hiệu lực</th>
-              <th className="fw-semibold text-center">Loại / Mô tả</th> 
-              <th className="fw-semibold text-center">Thao tác</th>
+              <th className="text-center">Mã</th>
+              <th className="text-center">Giảm</th>
+              <th className="text-center">Đơn tối thiểu</th>
+              <th className="text-center">Giảm tối đa</th>
+              <th className="text-center">Hiệu lực</th>
+              <th className="text-center">Loại</th>
+              <th className="text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {vouchers.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center text-muted py-5 fs-5">
-                  Chưa có voucher nào.
+                <td colSpan={7} className="text-center py-5 text-muted fs-5">
+                  Chưa có voucher nào
                 </td>
               </tr>
             ) : (
-              vouchers.map((v) => (
-                <tr key={v.id || v.code}> 
-                  <td className="fw-bold text-primary text-center" style={{ fontSize: "1.1em", letterSpacing: ".4px" }}>
-                    <span className="px-3 py-1 rounded-pill" style={{ background: "#f1f6ff", fontSize: "1em" }}>{v.code}</span>
+              vouchers.map((v, index) => (
+                <tr key={v.id || index}>
+                  <td className="text-center fw-bold">
+                    <span className="px-3 py-1 bg-primary text-white rounded-pill">
+                      {v.code || v.ma_gg || `VOUCHER-${index + 1}`}
+                    </span>
                   </td>
-                  
-                  <td className="fw-bold text-success text-center">
+                  <td className="text-center fw-bold text-success">
                     {formatDiscount(v)}
                   </td>
-                  
-                  <td className="text-center">{(v.min_order || 0).toLocaleString('vi-VN')}đ</td>
-                  <td className="text-center">{(v.max_discount || 0).toLocaleString('vi-VN')}đ</td>
-                  
                   <td className="text-center">
-                    <DateDisplay date={v.start_date} /> →{' '}
-                    <DateDisplay date={v.end_date} />
+                    {(Number(v.min_order || v.don_toi_thieu || 0) || 0).toLocaleString("vi-VN")}đ
                   </td>
-                  
-                  <td className="text-center text-muted small" style={{ maxWidth: "220px" }}>
-                    <span className="fw-bold">{(v.type || 'N/A').toUpperCase()}</span>
-                    {v.description && v.description !== v.type && <div className="text-wrap">{v.description}</div>}
+                  <td className="text-center fw-bold text-danger">
+                    {formatMaxDiscount(v)}
                   </td>
-
                   <td className="text-center">
-                    <div className="d-flex justify-content-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="warning"
-                        style={{ borderRadius: "8px", minWidth: "80px", fontWeight: 600 }}
-                        onClick={() => {
-                          setEditingVoucher(v);
-                          setShowModal(true);
-                        }}
-                      >
-                        Sửa
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        style={{ borderRadius: "8px", minWidth: "80px", fontWeight: 600 }}
-                        onClick={() => handleDelete(v.id!)}
-                      >
-                        Xóa
-                      </Button>
-                    </div>
+                    <DateDisplay date={v.start_date || v.ngay_bd} /> → <DateDisplay date={v.end_date || v.ngay_kt} />
+                  </td>
+                  <td className="text-center">
+                    <span className={`badge ${
+                      (v.type || v.loai_giam) === "percent" ? "bg-info" : "bg-warning"
+                    }`}>
+                      {(v.type || v.loai_giam) === "percent" ? "Phần trăm" : "Cố định"}
+                    </span>
+                  </td>
+                  <td className="text-center">
+                    <Button
+                      size="sm"
+                      variant="outline-warning"
+                      className="me-2"
+                      onClick={() => {
+                        setEditingVoucher({
+                          ...v,
+                          start_date: (v.start_date || v.ngay_bd)?.split("T")[0],
+                          end_date: (v.end_date || v.ngay_kt)?.split("T")[0] || null,
+                        });
+                        setShowModal(true);
+                      }}
+                    >
+                      Sửa
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline-danger"
+                      onClick={() => (v.id || index) && handleDelete(v.id || index)}
+                    >
+                      Xóa
+                    </Button>
                   </td>
                 </tr>
               ))
@@ -274,193 +226,149 @@ export default function AdminVoucherPage() {
         </Table>
       </div>
 
-      {/* MODAL */}
-      <Modal
-        show={showModal}
-        onHide={() => setShowModal(false)}
-        size="lg"
-        centered
-        style={{ backdropFilter: "blur(4px)" }}
-      >
+      {/* Modal - giữ nguyên cấu trúc cũ để an toàn */}
+      <Modal show={showModal} onHide={() => setShowModal(false)} size="lg" centered>
         <Modal.Header
           closeButton
-          style={{
-            background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)",
-            color: "white",
-            borderBottom: "none"
-          }}
+          style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}
         >
           <Modal.Title className="fw-bold">
-            {editingVoucher?.id ? "✏️ Chỉnh sửa Voucher" : "➕ Thêm Voucher mới"}
+            {editingVoucher?.id ? "Chỉnh sửa Voucher" : "Thêm Voucher Mới"}
           </Modal.Title>
         </Modal.Header>
+
         <Form onSubmit={handleSave}>
-          <Modal.Body style={{ padding: "2rem" }}>
-            <Row className="mb-3">
+          <Modal.Body className="p-4">
+            <Row className="g-3">
               <Col md={4}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Mã voucher <span className="text-danger">*</span>
-                </Form.Label>
+                <Form.Label>Mã voucher *</Form.Label>
                 <Form.Control
                   type="text"
                   value={editingVoucher?.code || ""}
                   onChange={(e) =>
-                    setEditingVoucher({ ...editingVoucher!, code: e.target.value })
+                    setEditingVoucher(editingVoucher ? { ...editingVoucher, code: e.target.value.toUpperCase() } : null)
                   }
-                  placeholder="Nhập mã voucher"
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}
+                  placeholder="VD: SALE2025"
                   required
                 />
               </Col>
-              
+
               <Col md={4}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Loại Giảm Giá <span className="text-danger">*</span>
-                </Form.Label>
+                <Form.Label>Loại giảm giá *</Form.Label>
                 <Form.Select
-                  value={editingVoucher?.type || 'percent'}
+                  value={editingVoucher?.type || "percent"}
                   onChange={(e) =>
-                    setEditingVoucher({ ...editingVoucher!, type: e.target.value as 'fixed' | 'percent' })
+                    setEditingVoucher(editingVoucher ? { ...editingVoucher, type: e.target.value as "fixed" | "percent" } : null)
                   }
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}
-                  required
                 >
                   <option value="percent">Phần trăm (%)</option>
-                  <option value="fixed">Cố định (VNĐ)</option>
+                  <option value="fixed">Số tiền cố định</option>
                 </Form.Select>
               </Col>
 
               <Col md={4}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Giá trị giảm <span className="text-danger">*</span>
-                </Form.Label>
+                <Form.Label>Giá trị giảm *</Form.Label>
                 <Form.Control
                   type="number"
-                  min={0}
-                  value={editingVoucher?.discount || 0}
+                  min="1"
+                  max={editingVoucher?.type === "percent" ? 100 : undefined}
+                  value={editingVoucher?.discount || ""}
                   onChange={(e) =>
-                    setEditingVoucher({
-                      ...editingVoucher!,
-                      discount: Number(e.target.value)
-                    })
+                    setEditingVoucher(editingVoucher ? { ...editingVoucher, discount: Number(e.target.value) || 0 } : null)
                   }
-                  placeholder="Giá trị giảm"
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}
                   required
                 />
               </Col>
             </Row>
-            <Row className="mb-3">
+
+            <Row className="g-3 mt-3">
               <Col md={6}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Đơn tối thiểu
-                </Form.Label>
+                <Form.Label>Đơn tối thiểu (VNĐ)</Form.Label>
                 <Form.Control
                   type="number"
-                  min={0}
-                  value={editingVoucher?.min_order || 0}
-                  onChange={(e) =>
-                    setEditingVoucher({
-                      ...editingVoucher!,
-                      min_order: Number(e.target.value),
-                    })
-                  }
-                  placeholder="Đơn tối thiểu (VNĐ)"
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}
+                  min="0"
+                  value={editingVoucher?.min_order || ""}
+                  onChange={(e) => {
+                    const val = Number(e.target.value) || 0;
+                    setEditingVoucher(
+                      editingVoucher
+                        ? {
+                            ...editingVoucher,
+                            min_order: val,
+                            max_discount:
+                              editingVoucher.type === "percent"
+                                ? Math.min(editingVoucher.max_discount || 0, Math.floor(val * 0.5))
+                                : editingVoucher.max_discount,
+                          }
+                        : null
+                    );
+                  }}
                 />
               </Col>
-              <Col md={6}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Giảm tối đa
-                </Form.Label>
-                <Form.Control
-                  type="number"
-                  min={0}
-                  value={editingVoucher?.max_discount || 0}
-                  onChange={(e) =>
-                    setEditingVoucher({
-                      ...editingVoucher!,
-                      max_discount: Number(e.target.value),
-                    })
-                  }
-                  placeholder="Giảm tối đa (VNĐ)"
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}
-                />
-              </Col>
+
+              {editingVoucher?.type === "percent" && (
+                <Col md={6}>
+                  <Form.Label>
+                    Giảm tối đa (VNĐ) <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    max={getMaxAllowedDiscount()}
+                    value={editingVoucher?.max_discount || ""}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      const max = getMaxAllowedDiscount();
+                      if (val > max) {
+                        toast.error(`Chỉ được tối đa ${max.toLocaleString()}đ!`);
+                        return;
+                      }
+                      setEditingVoucher(editingVoucher ? { ...editingVoucher, max_discount: val } : null);
+                    }}
+                    placeholder={`Tối đa: ${getMaxAllowedDiscount().toLocaleString()}đ`}
+                    className="fw-bold border-danger"
+                    required
+                  />
+                  <div className="text-danger fw-bold mt-2">
+                    CHỈ ĐƯỢC NHẬP TỐI ĐA {getMaxAllowedDiscount().toLocaleString()}đ (50% đơn)
+                  </div>
+                </Col>
+              )}
             </Row>
-            <Row className="mb-3">
+
+            <Row className="g-3 mt-3">
               <Col md={6}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Ngày bắt đầu
-                </Form.Label>
+                <Form.Label>Ngày bắt đầu *</Form.Label>
                 <Form.Control
                   type="date"
-                  value={editingVoucher?.start_date?.split("T")[0] || ""}
+                  value={editingVoucher?.start_date || ""}
                   onChange={(e) =>
-                    setEditingVoucher({
-                      ...editingVoucher!,
-                      start_date: e.target.value,
-                    })
+                    setEditingVoucher(editingVoucher ? { ...editingVoucher, start_date: e.target.value } : null)
                   }
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}
+                  required
                 />
               </Col>
               <Col md={6}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Ngày kết thúc
-                </Form.Label>
+                <Form.Label>Ngày kết thúc</Form.Label>
                 <Form.Control
                   type="date"
-                  value={editingVoucher?.end_date?.split("T")[0] || ""}
+                  value={editingVoucher?.end_date || ""}
+                  min={editingVoucher?.start_date}
                   onChange={(e) =>
-                    setEditingVoucher({
-                      ...editingVoucher!,
-                      end_date: e.target.value,
-                    })
+                    setEditingVoucher(editingVoucher ? { ...editingVoucher, end_date: e.target.value || null } : null)
                   }
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}
-                />
-              </Col>
-            </Row>
-            <Row>
-              <Col md={12}>
-                <Form.Label className="fw-semibold mb-2" style={{ color: "#21409A" }}>
-                  Mô tả
-                </Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={2}
-                  value={editingVoucher?.description || ""}
-                  onChange={(e) =>
-                    setEditingVoucher({
-                      ...editingVoucher!,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Mô tả ngắn về voucher..."
-                  style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px" }}
                 />
               </Col>
             </Row>
           </Modal.Body>
-          <Modal.Footer style={{ borderTop: "2px solid #e0e0e0", padding: "1.5rem" }}>
-            <Button
-              variant="secondary"
-              onClick={() => setShowModal(false)}
-              className="px-4 py-2 fw-semibold"
-              style={{ borderRadius: "10px" }}
-            >
-              Huỷ
+
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              Hủy
             </Button>
             <Button
-              variant="primary"
               type="submit"
-              className="px-4 py-2 fw-semibold"
-              style={{
-                borderRadius: "10px",
-                background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)",
-                border: "none",
-              }}
+              style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", border: "none" }}
             >
               {editingVoucher?.id ? "Lưu thay đổi" : "Thêm mới"}
             </Button>

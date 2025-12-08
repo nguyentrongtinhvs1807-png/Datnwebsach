@@ -15,12 +15,18 @@ interface User {
 // 🔹 Hàm fetch người dùng từ server
 const fetchUsers = async (): Promise<User[]> => {
   try {
-    const res = await fetch("http://localhost:3003/users");
+    const res = await fetch("http://localhost:3003/users/all", {
+      cache: "no-store"  // cực kỳ quan trọng, tránh cache cũ
+    });
+    if (!res.ok) {
+      console.error("API lỗi:", res.status);
+      return [];
+    }
     const data = await res.json();
-    if (Array.isArray(data)) return data;
-    return [];
+    console.log("Danh sách user nhận được:", data); // XEM LOG NÀY TRONG CONSOLE
+    return Array.isArray(data) ? data : [];
   } catch (err) {
-    console.error("❌ Lỗi khi tải users:", err);
+    console.error("Lỗi kết nối API:", err);
     return [];
   }
 };
@@ -84,13 +90,14 @@ export default function UserManager() {
 
   // 🔹 Lọc danh sách hiển thị
   const filtered = users
-    .filter((u) => (showHidden ? true : u.is_hidden !== 1))
-    .filter((u) => {
-      const keyword = search.toLowerCase();
-      const ten = (u.ho_ten ?? "").toLowerCase();
-      const email = (u.email ?? "").toLowerCase();
-      return ten.includes(keyword) || email.includes(keyword);
-    });
+  .filter((u) => showHidden || u.is_hidden !== 1)
+  .filter((u) => {
+    if (!search.trim()) return true;
+    const keyword = search.toLowerCase();
+    const ten = (u.ho_ten ?? "").toLowerCase();
+    const email = (u.email ?? "").toLowerCase();
+    return ten.includes(keyword) || email.includes(keyword);
+  });
 
   return (
     <div className="p-4">
@@ -110,10 +117,11 @@ export default function UserManager() {
             onChange={(e) => setSearch(e.target.value)}
           />
           <button
-            className="btn btn-outline-secondary"
-            onClick={() => setShowHidden((p) => !p)}
+            type="button"
+            className={`btn px-4 fw-bold ${showHidden ? "btn-success" : "btn-outline-danger"}`}
+            onClick={() => setShowHidden(prev => !prev)}
           >
-            {showHidden ? "Ẩn người bị ẩn" : "Hiện người bị ẩn"}
+            {showHidden ? "Đang hiển thị tất cả người dùng" : "Hiện người bị ẩn"}
           </button>
         </div>
 

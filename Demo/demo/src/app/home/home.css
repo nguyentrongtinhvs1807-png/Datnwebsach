@@ -1,11 +1,14 @@
 /* ===== GLOBAL ===== */
 body {
-  background-color: #f9f9f9;
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+  min-height: 100vh;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: #333;
   margin: 0;
   padding: 0;
 }
+
+/* Nếu bạn có class .min-vh-100 hoặc div bao ngoài trang thì không cần nữa, vì body đã có nền rồi */
 
 h2 {
   font-size: 1.8rem;
@@ -265,4 +268,5 @@ nav a {
   box-shadow: 0 4px 20px rgba(208, 191, 125, 0.4); /* đổ bóng vàng nhẹ */
   transform: translateY(-5px); /* nhấc nhẹ lên khi hover */
 }
+
 
