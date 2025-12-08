@@ -1,23 +1,14 @@
-// src/app/api/sanpham/danhmuc/[id]/route.ts
-
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 
-// Định nghĩa type rõ ràng – Next.js 15 yêu cầu nghiêm ngặt hơn
-type RouteContext = {
-  params: {
-    id: string;
-  };
-};
-
-export async function GET(_request: Request, context: RouteContext) {
-  const { id } = context.params;
+export async function GET(
+  _request: Request,
+  { params }: { params: { id: string } }
+) {
+  const { id } = params;
 
   if (!id) {
-    return NextResponse.json(
-      { error: "Thiếu ID danh mục" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Thiếu ID danh mục" }, { status: 400 });
   }
 
   try {
@@ -26,13 +17,9 @@ export async function GET(_request: Request, context: RouteContext) {
       [id]
     );
 
-    // Nếu không có sản phẩm nào thì vẫn trả 200 + mảng rỗng (chuẩn REST)
     return NextResponse.json(rows.length > 0 ? rows : [], { status: 200 });
   } catch (error) {
     console.error("Lỗi lấy sản phẩm theo danh mục:", error);
-    return NextResponse.json(
-      { error: "Lỗi server nội bộ" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Lỗi server nội bộ" }, { status: 500 });
   }
 }
