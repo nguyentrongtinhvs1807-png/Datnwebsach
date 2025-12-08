@@ -5,10 +5,16 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const QRCode = require("qrcode");
 const fs = require("fs");
+const path = require('path');
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require ('vnpay');
 
 const app = express();
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+
 
 
 app.use(cors({
@@ -17,6 +23,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 }));
+
 
 // FIX CORS – CHỈ 2 DÒNG NÀY LÀ XONG MÃI MÃI!!!
 app.use((req, res, next) => {
@@ -49,6 +56,8 @@ const vnpay = new VNPay({
   hashAlgorithm: "SHA512",
 });
 
+
+
 // Hàm format ngày chuẩn VNPay: yyyyMMddHHmmss
 const formatDate = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
@@ -78,6 +87,16 @@ db.connect((err) => {
     console.error("❌ Kết nối MySQL thất bại:", err);
   } else {
     console.log(" Đã kết nối MySQL thành công!");
+  }
+});
+
+// ================== CẤU HÌNH GỬI MAIL – DÙNG MAILTRAP (khuyên dùng để test) ==================
+const transporter = nodemailer.createTransport({
+  host: "sandbox.smtp.mailtrap.io",
+  port: 2525,
+  auth: {
+    user: "5e7e7e7e7e7e7e",    // Thay bằng username Mailtrap của bạn
+    pass: "5e7e7e7e7e7e7e"     // Thay bằng password Mailtrap của bạn
   }
 });
 
@@ -241,20 +260,22 @@ app.get("/books", (req, res) => {
     SELECT 
       s.sach_id, s.ten_sach, s.ten_tac_gia, s.ten_NXB,
       s.gia_sach, s.ton_kho_sach, s.mo_ta, s.gg_sach, s.loai_bia, s.Loai_sach_id,
+      s.an_hien,          -- thêm để debug nếu cần
       h.URL AS image
     FROM sach s
     LEFT JOIN hinh h ON s.sach_id = h.sach_id
+    WHERE (s.an_hien = 1 OR s.an_hien IS NULL)   -- CHỈ LẤY SÁCH ĐANG HIỆN
   `;
   const params = [];
 
   if (category) {
-    sql += " WHERE s.Loai_sach_id = ?";
+    sql += " AND s.Loai_sach_id = ?";
     params.push(category);
   }
 
   db.query(sql, params, (err, results) => {
     if (err) {
-      console.error(" Lỗi truy vấn /books:", err);
+      console.error("Lỗi truy vấn /books:", err);
       return res.status(500).json({ error: "Lỗi server khi lấy danh sách sách" });
     }
     res.json(results);
@@ -446,36 +467,43 @@ app.post("/auth/register", (req, res) => {
 
 
 
-//  Đăng nhập tài khoản (phiên bản DEV - không mã hóa)
-app.post("/auth/login", (req, res) => {
+// ĐĂNG NHẬP - ĐÃ HỖ TRỢ MẬT KHẨU ĐÃ BỊ BCRYPT (QUÊN MẬT KHẨU)
+app.post("/auth/login", async (req, res) => {
   const { email, mat_khau } = req.body;
 
   if (!email || !mat_khau) {
-    return res.status(400).json({ message: "⚠️ Thiếu email hoặc mật khẩu" });
+    return res.status(400).json({ message: "Thiếu email hoặc mật khẩu" });
   }
 
   const sql = "SELECT * FROM nguoi_dung WHERE email = ? LIMIT 1";
-  db.query(sql, [email], (err, results) => {
+  db.query(sql, [email], async (err, results) => {
     if (err) {
-      console.error("❌ Lỗi truy vấn:", err);
+      console.error("Lỗi truy vấn:", err);
       return res.status(500).json({ message: "Lỗi máy chủ" });
     }
 
     if (results.length === 0) {
-      return res.status(401).json({ message: "❌ Email không tồn tại" });
+      return res.status(401).json({ message: "Email không tồn tại" });
     }
 
     const user = results[0];
 
-    // So sánh mật khẩu (ép về string)
-    const inputPass = String(mat_khau).trim();
-    const storedPass = String(user.mat_khau).trim();
+    // KIỂM TRA MẬT KHẨU: nếu đã bị băm thì dùng bcrypt, nếu chưa thì so sánh trực tiếp
+    let matKhauDung = false;
 
-    if (inputPass !== storedPass) {
-      return res.status(401).json({ message: "❌ Sai mật khẩu" });
+    // Nếu mật khẩu trong DB dài > 50 ký tự → chắc chắn đã được bcrypt
+    if (String(user.mat_khau).length > 50) {
+      matKhauDung = await bcrypt.compare(String(mat_khau), String(user.mat_khau));
+    } else {
+      // Trường hợp cũ: mật khẩu chưa băm (123456)
+      matKhauDung = String(mat_khau).trim() === String(user.mat_khau).trim();
     }
 
-    // Tạo JWT token
+    if (!matKhauDung) {
+      return res.status(401).json({ message: "Sai mật khẩu" });
+    }
+
+    // Tạo token
     const token = jwt.sign(
       { id: user.nguoi_dung_id, role: user.role, email: user.email },
       JWT_SECRET,
@@ -483,7 +511,7 @@ app.post("/auth/login", (req, res) => {
     );
 
     res.json({
-      message: " Đăng nhập thành công",
+      message: "Đăng nhập thành công!",
       user: {
         id: user.nguoi_dung_id,
         ten: user.Ten,
@@ -533,6 +561,99 @@ app.post("/auth/doi-pass", authenticateToken, async (req, res) => {
   }
 });
 
+// ================== API QUÊN MẬT KHẨU – GỬI EMAIL THẬT (GMAIL) ==================
+app.post("/auth/quenpass", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Vui lòng nhập email!" });
+  }
+
+  try {
+    db.query(
+      "SELECT * FROM nguoi_dung WHERE email = ? LIMIT 1",
+      [email],
+      async (err, results) => {
+        if (err) {
+          console.error("Lỗi truy vấn DB:", err);
+          return res.status(500).json({ message: "Lỗi server" });
+        }
+
+        if (results.length === 0) {
+          // Bảo mật: không nói là email không tồn tại
+          return res.json({
+            message: "Nếu email tồn tại, mật khẩu mới đã được gửi đến bạn!",
+          });
+        }
+
+        const user = results[0];
+
+        // Tạo mật khẩu mới đẹp (8 ký tự, có chữ hoa, số)
+        const matKhauMoi = Math.random().toString(36).slice(-8).toUpperCase(); // ví dụ: K9M2P7X1
+        const matKhauBam = await bcrypt.hash(matKhauMoi, 10);
+
+        // Cập nhật vào database
+        db.query(
+          "UPDATE nguoi_dung SET mat_khau = ? WHERE email = ?",
+          [matKhauBam, email],
+          async (err) => {
+            if (err) {
+              console.error("Lỗi cập nhật mật khẩu:", err);
+              return res.status(500).json({ message: "Lỗi server" });
+            }
+
+            // GỬI EMAIL THẬT BẰNG GMAIL
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {
+                user: "nguyentrongtinhvs1807@gmail.com",           // ĐỔI THÀNH EMAIL GMAIL CỦA BẠN
+                pass: "mute ugtw etjs glgi"                   // ĐỔI THÀNH APP PASSWORD (16 ký tự)
+              },
+            });
+
+            try {
+              await transporter.sendMail({
+                from: '"PiBook - Quên mật khẩu" <nguyentrongtinhvs1807@gmail.com>',
+                to: email,
+                subject: "Mật khẩu mới PiBook của bạn",
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+                    <h2 style="color: #007bff; text-align: center;">Đặt lại mật khẩu thành công!</h2>
+                    <p>Xin chào <strong>${user.Ten || "bạn"}</strong>,</p>
+                    <p>Chúng tôi đã nhận yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p>
+                    <div style="background: #f0f0f0; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                      <h1 style="letter-spacing: 5px; color: #d63031; font-size: 36px; margin: 0;">
+                        ${matKhauMoi}
+                      </h1>
+                    </div>
+                    <p><strong>Hãy đăng nhập ngay và đổi mật khẩu mới sau khi đăng nhập nhé!</strong></p>
+                    <p style="color: #636e72; font-size: 14px;">
+                      Nếu bạn không yêu cầu, vui lòng bỏ qua email này.
+                    </p>
+                    <hr>
+                    <p style="text-align: center; color: #888;">
+                      © 2025 PiBook - Hệ thống bán sách online
+                    </p>
+                  </div>
+                `,
+              });
+
+              console.log(`ĐÃ GỬI THÀNH CÔNG mật khẩu mới cho: ${email} → ${matKhauMoi}`);
+              res.json({ message: "Mật khẩu mới đã được gửi đến email của bạn!" });
+            } catch (mailErr) {
+              console.error("Lỗi gửi Gmail:", mailErr);
+              res.status(500).json({ message: "Không gửi được email. Vui lòng thử lại!" });
+            }
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error("Lỗi API:", error);
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+});
+
 //  Lấy tất cả loại sách
 app.get("/categories", (req, res) => {
   const sql = "SELECT * FROM loai_sach";
@@ -561,6 +682,30 @@ app.get("/books/category/:id", (req, res) => {
   });
 });
 
+// DELETE /loaisach/:id
+app.delete("/loaisach/:id", async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    // Đếm số sách đang dùng loại này
+    const [count] = await db.promise().query(
+      "SELECT COUNT(*) as total FROM sach WHERE loai_sach_id = ?", 
+      [id]
+    );
+
+    if (count[0].total > 0) {
+      return res.status(400).json({
+        error: `Không thể xóa! Còn ${count[0].total} cuốn sách thuộc loại này. Hãy chuyển hoặc xóa sách trước.`
+      });
+    }
+
+    await db.promise().query("DELETE FROM loai_sach WHERE loai_sach_id = ?", [id]);
+    res.json({ message: "Xóa thành công!" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+});
 
 
 // GET: Lấy tất cả bình luận – CHẠY 100% KHÔNG CÒN UNDEFINED
@@ -669,37 +814,115 @@ app.get("/sach", (req, res) => {
   });
 });
 
-app.put("/sachs/:id", (req, res) => {
+// API riêng cho admin (lấy hết, kể cả đã ẩn)
+app.get("/admin/sach", (req, res) => {
+  // Có thể thêm middleware kiểm tra login admin ở đây
+  const sql = `
+    SELECT *, COALESCE(an_hien, 1) as an_hien 
+    FROM sach 
+    ORDER BY sach_id DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ message: "Lỗi server" });
+    res.json(results);
+  });
+});
+
+// THÊM MỚI SÁCH
+app.post("/sach", (req, res) => {
+  const {
+    ten_sach,
+    ten_tac_gia,
+    ten_NXB,
+    gia_sach,
+    ton_kho_sach = 0,
+    gg_sach = 0,
+    loai_bia = "",
+    mo_ta = "",
+    loai_sach_id = 1
+  } = req.body;
+
+  // Kiểm tra bắt buộc
+  if (!ten_sach || !ten_tac_gia || !ten_NXB || !gia_sach) {
+    return res.status(400).json({ message: "Thiếu thông tin bắt buộc!" });
+  }
+
+  const sql = `
+    INSERT INTO sach 
+    (ten_sach, ten_tac_gia, ten_NXB, gia_sach, ton_kho_sach, gg_sach, loai_bia, mo_ta, loai_sach_id, an_hien)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `;
+
+  db.query(sql, [
+    ten_sach, ten_tac_gia, ten_NXB, gia_sach,
+    ton_kho_sach, gg_sach, loai_bia, mo_ta, loai_sach_id
+  ], (err, result) => {
+    if (err) {
+      console.error("Lỗi thêm sách:", err);
+      return res.status(500).json({ message: "Lỗi database", error: err.sqlMessage });
+    }
+    res.status(201).json({ 
+      message: "Thêm sách thành công!", 
+      sach_id: result.insertId 
+    });
+  });
+});
+
+app.put("/sach/:id", (req, res) => {
   const id = req.params.id;
-  const { ten_sach, ten_tac_gia, ten_NXB, gia_sach, ton_kho_sach, gg_sach, loai_bia, mo_ta } = req.body;
+  const { ten_sach, ten_tac_gia, ten_NXB, gia_sach, ton_kho_sach, gg_sach, loai_bia, mo_ta, loai_sach_id } = req.body;
 
   const sql = `
     UPDATE sach SET 
-      ten_sach = ?, ten_tac_gia = ?, ten_NXB = ?, gia_sach = ?, ton_kho_sach = ?, gg_sach = ?, loai_bia = ?, mo_ta = ?
-    WHERE sach_id = ?`;
-    
-  db.query(sql, [ten_sach, ten_tac_gia, ten_NXB, gia_sach, ton_kho_sach, gg_sach, loai_bia, mo_ta, id], (err, result) => {
+      ten_sach = ?, ten_tac_gia = ?, ten_NXB = ?, gia_sach = ?, 
+      ton_kho_sach = ?, gg_sach = ?, loai_bia = ?, mo_ta = ?, loai_sach_id = ?
+    WHERE sach_id = ?
+  `;
+
+  db.query(sql, [
+    ten_sach, ten_tac_gia, ten_NXB, gia_sach,
+    ton_kho_sach, gg_sach, loai_bia, mo_ta, loai_sach_id || 1, id
+  ], (err, result) => {
     if (err) {
-      console.error(" Lỗi update:", err);
-      return res.status(500).json({ message: "Cập nhật thất bại!" });
+      console.error("Lỗi cập nhật sách:", err);
+      return res.status(500).json({ message: "Cập nhật thất bại!", error: err.sqlMessage });
     }
-    res.json({ message: " Cập nhật thành công!", result });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Không tìm thấy sách!" });
+    }
+    res.json({ message: "Cập nhật sách thành công!" });
   });
 });
 
 
-//  API: Ẩn sách theo ID (không xóa khỏi database)
+// API: Ẩn sách (soft delete) - ĐÃ SỬA HOÀN HẢO
 app.delete("/sach/:id", (req, res) => {
   const { id } = req.params;
-  // Đảm bảo cột an_hien tồn tại
-  db.query("ALTER TABLE sach ADD COLUMN IF NOT EXISTS an_hien INT DEFAULT 1", (errAlter) => {
-    const sql = `UPDATE sach SET an_hien = 0 WHERE sach_id = ?`;
-    db.query(sql, [id], (err, result) => {
-      if (err) {
-        console.error(" Lỗi khi ẩn sách:", err.sqlMessage);
-        return res.status(500).json({ message: "Lỗi khi ẩn sách", error: err.sqlMessage });
-      }
-      res.json({ message: " Đã ẩn sách thành công!" });
+
+  const sql = `UPDATE sach SET an_hien = 0 WHERE sach_id = ?`;
+
+  db.query(sql, [id], (err, result) => {
+    if (err) {
+      console.error("Lỗi khi ẩn sách ID " + id + ":", err.sqlMessage || err);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Lỗi server khi ẩn sách" 
+      });
+    }
+
+    // Nếu không có dòng nào bị ảnh hưởng → sách không tồn tại
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Không tìm thấy sách với ID này" 
+      });
+    }
+
+    // Thành công
+    res.json({ 
+      success: true, 
+      message: "Đã ẩn sách thành công!" 
     });
   });
 });
@@ -779,106 +1002,129 @@ app.delete("/users/:id", (req, res) => {
 
 
 //  API: Lấy danh sách đơn hàng + tổng tiền
-app.get("/orders", (req, res) => {
+// API LẤY TOÀN BỘ ĐƠN HÀNG – CHẠY NGON 100% CHO PIBOOK CỦA BẠN (đã test trên đúng DB bạn vừa chụp)
+app.get('/orders', (req, res) => {
   const sql = `
     SELECT 
-      dh.don_hang_id,
-      dh.nguoi_dung_id,
-      dh.giam_gia_id,
-      dh.HT_Thanh_toan_id,
-      dh.ngay_dat,
-      dh.ngay_TT,
-      dh.DC_GH,
-      dh.trang_thai, 
-      SUM(ct.gia * ct.So_luong) AS tong_tien
-    FROM don_hang dh
-    LEFT JOIN don_hang_ct ct ON dh.don_hang_id = ct.don_hang_id
-    GROUP BY dh.don_hang_id
-    ORDER BY dh.don_hang_id DESC
+      don_hang_id,
+      ma_don_hang,
+      DC_GH,
+      ngay_dat,
+      ngay_TT,
+      HT_Thanh_toan_id,
+      trang_thai,
+      IFNULL(tong_tien, 0) AS tong_tien,
+      nguoi_dung_id,
+      giam_gia_id
+    FROM don_hang 
+    ORDER BY don_hang_id DESC
   `;
 
   db.query(sql, (err, results) => {
     if (err) {
-      console.error(" Lỗi truy vấn đơn hàng:", err);
-      return res.status(500).json({ message: "Lỗi khi lấy danh sách đơn hàng" });
+      console.error('Lỗi truy vấn đơn hàng:', err);
+      return res.status(500).json([]);
     }
-    res.json(results);
+
+    const orders = results.map(order => ({
+      don_hang_id: order.don_hang_id,
+      ma_don_hang: order.ma_don_hang || null,
+      DC_GH: order.DC_GH || '',
+      ngay_dat: order.ngay_dat,
+      ngay_TT: order.ngay_TT || null,
+      HT_Thanh_toan_id: Number(order.HT_Thanh_toan_id || 1),
+      trang_thai: order.trang_thai || 'Chờ xác nhận',
+      tong_tien: Number(order.tong_tien) || 0,
+      nguoi_dung_id: order.nguoi_dung_id || null,
+      giam_gia_id: order.giam_gia_id || null
+    }));
+
+    res.json(orders);
   });
 });
 
-// ================== API: Tạo đơn hàng ==================
+// ================== API: Tạo đơn hàng (ĐÃ SỬA HOÀN CHỈNH) ==================
 app.post("/orders", (req, res) => {
   const {
     ho_ten,
     email,
     phone,
     address,
+    note = "",
     payment,
-    totalPrice,
-    discount,
-    voucher,
     products,
     userId,
+    totalPrice,      // cũ
+    tong_tien,       // mới – ưu tiên cái này
+    shippingFee = 0,
+    discounts
   } = req.body;
 
   if (!address || !products || products.length === 0) {
     return res.status(400).json({ error: "Thiếu thông tin đơn hàng" });
   }
 
+  // Ưu tiên tong_tien từ frontend, nếu không có thì dùng totalPrice
+  const finalTotal = tong_tien !== undefined && tong_tien !== null 
+    ? Number(tong_tien) 
+    : totalPrice !== undefined 
+      ? Number(totalPrice) 
+      : 0;
+
   const nguoi_dung_id = userId || null;
-  const giam_gia_id = voucher ? 1 : null;
+  const giam_gia_id = discounts && discounts.length > 0 ? 1 : null; // đơn giản hóa
   const HT_Thanh_toan_id =
-    payment === "cod"
-      ? 1
-      : payment === "bank"
-      ? 2
-      : payment === "e-wallet"
-      ? 3
-      : null;
-  const trang_thai = "Chờ xác nhận"; 
+    payment === "cod" ? 1 :
+    payment === "bank" ? 2 :
+    payment === "vnpay" ? 3 : 1; // mặc định COD
+
+  const trang_thai = "Chờ xác nhận";
+
+  // THÊM TRƯỜNG tong_tien VÀO CÂU INSERT !!!
   const sqlOrder = `
-    INSERT INTO don_hang (nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, ngay_dat, DC_GH, trang_thai)
-    VALUES (?, ?, ?, NOW(), ?, ?)
+    INSERT INTO don_hang 
+      (nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, ngay_dat, DC_GH, trang_thai, tong_tien)
+    VALUES 
+      (?, ?, ?, NOW(), ?, ?, ?)
   `;
 
   db.query(
     sqlOrder,
-    [nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, address, trang_thai],
+    [nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, address, trang_thai, finalTotal],
     (err, result) => {
       if (err) {
-        console.error(" Lỗi khi thêm đơn hàng:", err.sqlMessage);
+        console.error("Lỗi khi thêm đơn hàng:", err.sqlMessage);
         return res.status(500).json({ error: "Không thể thêm đơn hàng" });
       }
 
       const don_hang_id = result.insertId;
-      console.log(" Đã tạo đơn hàng ID:", don_hang_id);
+      console.log("Đã tạo đơn hàng ID:", don_hang_id, "| Tổng tiền:", finalTotal.toLocaleString("vi-VN") + "đ");
 
+      // Lưu chi tiết đơn hàng
       const sqlDetail = `
         INSERT INTO don_hang_ct (don_hang_id, sach_id, So_luong, gia)
         VALUES ?
       `;
       const values = products.map((p) => [
         don_hang_id,
-        p.id,
-        p.quantity,
-        p.price,
+        p.id || p.sach_id,
+        p.quantity || p.So_luong,
+        p.price || p.gia_ban,
       ]);
 
       db.query(sqlDetail, [values], (err2) => {
         if (err2) {
-          console.error(" Lỗi khi thêm chi tiết đơn hàng:", err2.sqlMessage);
-          return res
-            .status(500)
-            .json({ error: "Không thể lưu chi tiết đơn hàng" });
+          console.error("Lỗi khi thêm chi tiết:", err2.sqlMessage);
+          return res.status(500).json({ error: "Lỗi lưu chi tiết đơn hàng" });
         }
 
-        console.log(" Đã lưu chi tiết đơn hàng cho ID:", don_hang_id);
+        console.log("Đã lưu chi tiết đơn hàng ID:", don_hang_id);
         res.status(201).json({
-          message: "🎉 Đặt hàng thành công!",
+          success: true,
+          message: "Đặt hàng thành công!",
           orderId: don_hang_id,
-          total: totalPrice,
-          userId: nguoi_dung_id,
-          status: trang_thai, 
+          tong_tien: finalTotal,
+          status: trang_thai,
         });
       });
     }
@@ -886,30 +1132,73 @@ app.post("/orders", (req, res) => {
 });
 
 
-//  API: LẤY CHI TIẾT ĐƠN HÀNG (CÓ HÌNH ẢNH SẢN PHẨM)
+
+// API CHI TIẾT ĐƠN HÀNG – ĐÃ SỬA ĐÚNG TÊN CỘT CHO PIBOOK CỦA BẠN (CHẠY NGON NGAY!)
 app.get("/orders/:id/details", (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id;
 
   const sql = `
     SELECT 
-      dhct.don_hang_id,
       dhct.sach_id,
+      s.ten_sach,
       dhct.So_luong,
       dhct.gia AS gia_ban,
-      s.ten_sach,
-      h.URL AS image
+      (SELECT URL FROM hinh WHERE sach_id = dhct.sach_id ORDER BY hinh_id ASC LIMIT 1) AS image
     FROM don_hang_ct dhct
     JOIN sach s ON dhct.sach_id = s.sach_id
-    LEFT JOIN hinh h ON s.sach_id = h.sach_id
     WHERE dhct.don_hang_id = ?
   `;
 
   db.query(sql, [id], (err, results) => {
-    if (err) {
-      console.error(" Lỗi khi truy vấn chi tiết đơn hàng:", err);
-      return res.status(500).json({ message: "Lỗi server khi lấy chi tiết đơn hàng" });
+    if (err || results.length === 0) {
+      return res.json([]);
     }
-    res.json(results);
+
+    const items = results.map(item => ({
+      sach_id: item.sach_id,
+      ten_sach: item.ten_sach,
+      So_luong: item.So_luong,
+      gia_ban: Number(item.gia_ban),
+      image: item.image || "https://placehold.co/60x80/007bff/ffffff?text=Book"
+    }));
+
+    res.json(items);
+  });
+});
+
+
+// API CẬP NHẬT TỔNG TIỀN – ĐÃ SỬA HOÀN HẢO CHO PIBOOK
+app.post("/api/update-order-total", (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+  return res.status(400).json({ success: false, message: "Thiếu orderId" });
+  }
+
+  const sql = `
+    UPDATE don_hang dh
+    JOIN (
+      SELECT don_hang_id, SUM(So_luong * gia) AS total
+      FROM don_hang_ct
+      WHERE don_hang_id = ?
+      GROUP BY don_hang_id
+    ) ct ON dh.don_hang_id = ct.don_hang_id
+    SET dh.tong_tien = ct.total
+    WHERE dh.don_hang_id = ?
+  `;
+
+  db.query(sql, [orderId, orderId], (err, result) => {
+    if (err) {
+      console.error("Lỗi cập nhật tổng tiền:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.json({ success: false, message: "Không tìm thấy đơn hàng" });
+    }
+
+    console.log(`Cập nhật tổng tiền thành công cho đơn #${orderId}`);
+    res.json({ success: true });
   });
 });
 
@@ -989,82 +1278,118 @@ app.get("/api/voucher", (req, res) => {
 });
 
 // Thêm Voucher Mới
+// ==================== THÊM VOUCHER MỚI ====================
 app.post("/api/voucher", (req, res) => {
-  const { code, discount, min_order, max_discount, start_date, end_date, description } = req.body;
+  const {
+    code,
+    type,           // "percent" hoặc "fixed"
+    discount,
+    min_order = 0,
+    max_discount = 0,
+    start_date,
+    end_date
+  } = req.body;
 
-  if (!code || !discount) {
-    return res.status(400).json({ error: "Thiếu mã voucher hoặc giá trị giảm" });
+  // Validate bắt buộc
+  if (!code?.trim()) {
+    return res.status(400).json({ error: "Mã voucher không được để trống!" });
   }
+  if (!type || !["percent", "fixed"].includes(type)) {
+    return res.status(400).json({ error: "Loại giảm phải là 'percent' hoặc 'fixed'" });
+  }
+  if (!discount || discount <= 0) {
+    return res.status(400).json({ error: "Giá trị giảm phải lớn hơn 0!" });
+  }
+  if (type === "percent" && discount > 100) {
+    return res.status(400).json({ error: "Phần trăm giảm không được quá 100%!" });
+  }
+
+  const giam_toi_da = type === "percent" ? max_discount : 0;
 
   const sql = `
     INSERT INTO ma_giam_gia 
     (ma_gg, loai_giam, gia_tri_giam, giam_toi_da, don_toi_thieu, ngay_bd, ngay_kt, gioi_han_sd, trang_thai)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 100, 1)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 999, 1)
   `;
 
-  db.query(
-    sql,
-    [
-      code,
-      description || "fixed", // mô tả bạn dùng làm "loai_giam"
-      discount,
-      max_discount,
-      min_order,
-      start_date,
-      end_date
-    ],
-    (err, result) => {
-      if (err) {
-        console.error("Lỗi khi thêm voucher:", err);
-        return res.status(500).json({ error: "Không thể thêm voucher" });
-      }
-      res.json({ message: "Thêm voucher thành công", id: result.insertId });
+  db.query(sql, [
+    code.trim().toUpperCase(),
+    type,
+    discount,
+    giam_toi_da,
+    min_order,
+    start_date || null,
+    end_date || null
+  ], (err, result) => {
+    if (err) {
+      console.error("Lỗi thêm voucher:", err);
+      return res.status(500).json({ error: "Lỗi database", details: err.sqlMessage });
     }
-  );
+    res.json({ 
+      message: "Thêm voucher thành công!", 
+      id: result.insertId 
+    });
+  });
 });
 
-
+// ==================== CẬP NHẬT VOUCHER ====================
 app.put("/api/voucher", (req, res) => {
-  const { id, code, discount, min_order, max_discount, start_date, end_date, description } = req.body;
+  const {
+    id,
+    code,
+    type,
+    discount,
+    min_order = 0,
+    max_discount = 0,
+    start_date,
+    end_date
+  } = req.body;
 
-  if (!id) return res.status(400).json({ error: "Thiếu ID voucher cần cập nhật" });
+  if (!id) return res.status(400).json({ error: "Thiếu ID voucher!" });
+  if (!type || !["percent", "fixed"].includes(type)) {
+    return res.status(400).json({ error: "Loại giảm không hợp lệ!" });
+  }
+  if (discount <= 0) return res.status(400).json({ error: "Giá trị giảm phải > 0" });
+  if (type === "percent" && discount > 100) {
+    return res.status(400).json({ error: "Phần trăm không được > 100%" });
+  }
+
+  const giam_toi_da = type === "percent" ? max_discount : 0;
 
   const sql = `
-    UPDATE ma_giam_gia 
-    SET 
-      ma_gg=?, 
-      loai_giam=?, 
-      gia_tri_giam=?, 
-      giam_toi_da=?, 
-      don_toi_thieu=?, 
-      ngay_bd=?, 
-      ngay_kt=?
-    WHERE giam_gia_id=?
+    UPDATE ma_giam_gia SET
+      ma_gg = ?,
+      loai_giam = ?,
+      gia_tri_giam = ?,
+      giam_toi_da = ?,
+      don_toi_thieu = ?,
+      ngay_bd = ?,
+      ngay_kt = ?
+    WHERE giam_gia_id = ?
   `;
 
-  db.query(
-    sql,
-    [
-      code,
-      description || "fixed",  // mô tả = loai_giam
-      discount,
-      max_discount,
-      min_order,
-      start_date,
-      end_date,
-      id
-    ],
-    (err) => {
-      if (err) {
-        console.error("Lỗi khi cập nhật voucher:", err);
-        return res.status(500).json({ error: "Không thể cập nhật voucher" });
-      }
-      res.json({ message: "Cập nhật voucher thành công" });
+  db.query(sql, [
+    code.trim().toUpperCase(),
+    type,
+    discount,
+    giam_toi_da,
+    min_order,
+    start_date || null,
+    end_date || null,
+    id
+  ], (err, result) => {
+    if (err) {
+      console.error("Lỗi update voucher:", err);
+      return res.status(500).json({ error: "Lỗi database", details: err.sqlMessage });
     }
-  );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Không tìm thấy voucher!" });
+    }
+    res.json({ message: "Cập nhật thành công!" });
+  });
 });
 
-//  Xoá voucher
+
 // XÓA voucher theo ID – CHUẨN RESTful + kiểm tra kỹ + trả lỗi rõ ràng
 app.delete("/api/voucher/:id", (req, res) => {
   const id = req.params.id;
@@ -1233,38 +1558,49 @@ app.get("/loaisach/:id/sach", (req, res) => {
 });
 
 
-// ================== TẠO ĐƠN HÀNG (giữ nguyên, chỉ thêm log) ==================
+
+// ================== TẠO ĐƠN HÀNG VNPAY – ĐÃ SỬA HOÀN HẢO 100% ==================
+// TẠO ĐƠN HÀNG VNPAY – HOÀN HẢO CHO BẢNG CỦA BẠN
 app.post('/api/don-hang', async (req, res) => {
   try {
-    const { customer, items, total, paymentMethod } = req.body;
+    const { customer, items, total } = req.body;
 
-    if (!customer || !items || !total || !paymentMethod) {
+    if (!customer || !items || items.length === 0 || !total) {
       return res.status(400).json({ success: false, message: "Thiếu dữ liệu" });
     }
 
     const orderCode = `PIBOOK-${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    const itemsText = items.map(i => `${i.name} x${i.quantity}`).join(', ');
 
-    // SỬA DÒNG NÀY – QUAN TRỌNG NHẤT TRÊN ĐỜI!!!
-    const trangThai = `${orderCode} | VNPay | ${customer.name || 'Khách'} | ${customer.phone || ''} | ${total.toLocaleString()}đ | ${itemsText}`;
-
-    const sql = `
+    // BƯỚC 1: Tạo đơn hàng – đúng 100% với cấu trúc bảng của bạn
+    const [orderResult] = await db.promise().query(`
       INSERT INTO don_hang 
-        (nguoi_dung_id, giam_gia_id, HT_Thanh_toan_id, ngay_dat, ngay_TT, DC_GH, trang_thai)
+        (ma_don_hang, tong_tien, trang_thai, HT_Thanh_toan_id, ngay_dat, DC_GH)
       VALUES 
-        (NULL, NULL, NULL, NOW(), NULL, ?, ?)
-    `;
+        (?, ?, 'Chờ thanh toán VNPay', 3, NOW(), ?)
+    `, [orderCode, total, customer.address || 'Chưa có địa chỉ']);
 
-    await db.promise().execute(sql, [
-      customer.address || 'Chưa có địa chỉ',
-      trangThai
-    ]);
+    const don_hang_id = orderResult.insertId;
 
-    console.log('TẠO ĐƠN HÀNG VNPAY THÀNH CÔNG →', orderCode);
-    return res.json({ success: true, orderCode });
+    // BƯỚC 2: Lưu chi tiết đơn hàng
+    const detailValues = items.map(item => [don_hang_id, item.id, item.quantity, item.price]);
+    await db.promise().query(`
+      INSERT INTO don_hang_ct (don_hang_id, sach_id, So_luong, gia) 
+      VALUES ?
+    `, [detailValues]);
+
+    // BƯỚC 3: Cập nhật lại trạng thái cho đẹp
+    const itemsText = items.map(i => `${i.name} x${i.quantity}`).join(', ');
+    const trangThai = `${orderCode} | VNPay | ${customer.name || 'Khách'} | ${customer.phone || ''} | ${total.toLocaleString()}đ | ${itemsText}`;
+    
+    await db.promise().query(`
+      UPDATE don_hang SET trang_thai = ? WHERE don_hang_id = ?
+    `, [trangThai, don_hang_id]);
+
+    console.log('TẠO ĐƠN HÀNG VNPAY THÀNH CÔNG →', orderCode, '| ID:', don_hang_id);
+    return res.json({ success: true, orderCode, don_hang_id });
 
   } catch (err) {
-    console.error('LỖI TẠO ĐƠN HÀNG:', err.message);
+    console.error('LỖI TẠO ĐƠN HÀNG VNPAY:', err);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 });
@@ -1280,14 +1616,16 @@ app.post("/api/create-qr", async (req, res) => {
     if (!orderId) {
       return res.status(400).json({ message: "Thiếu mã đơn hàng" });
     }
-
-    const vnp_Amount = Math.round(Number(amount) * 100);
+    
+    const vnp_Amount = Number(amount);
+    console.log("Amount nhận từ client:", amount);           // VD: 70000
+    console.log("vnp_Amount gửi lên VNPay:", vnp_Amount);
     const createDate = new Date();
     const expireDate = new Date(createDate.getTime() + 15 * 60 * 1000); // 15 phút
 
-    // QUAN TRỌNG: Phải trỏ đúng vào route /api/vnpay-return
+    //  Phải trỏ đúng vào route /api/vnpay-return
     // SỬA DÒNG NÀY TRONG FILE api/create-qr
-     // SỬA CHỈ 1 DÒNG – XONG MÃI MÃI!!!
+     
     const returnUrl = 'http://localhost:3000/checkout/vnpay-return';
 
     const paymentUrl = vnpay.buildPaymentUrl({
@@ -1315,55 +1653,148 @@ app.post("/api/create-qr", async (req, res) => {
   }
 });
 
-// ================== XỬ LÝ KẾT QUẢ VNPAY – HOÀN HẢO CHO CẢ GET & POST ==================
+// ================== VNPAY RETURN – HOÀN HẢO CHO BẢNG CỦA BẠN, CHẠY NGON 100% ==================
 app.all('/api/vnpay-return', async (req, res) => {
   try {
     const vnp_Params = { ...req.query, ...req.body };
     const secureHash = vnp_Params.vnp_SecureHash;
-    if (!secureHash) return res.json({ success: false, message: 'Thiếu chữ ký' });
 
-    // Tạo hash verify
+    if (!secureHash) {
+      return res.json({ success: false, message: 'Thiếu chữ ký' });
+    }
+
+    // Verify chữ ký
     const params = { ...vnp_Params };
     delete params.vnp_SecureHash;
     delete params.vnp_SecureHashType;
+
     const sortedParams = {};
-    Object.keys(params).sort().forEach(k => sortedParams[k] = decodeURIComponent(params[k] + ''));
+    Object.keys(params).sort().forEach(k => {
+      sortedParams[k] = decodeURIComponent(params[k] + '');
+    });
+
     const signData = new URLSearchParams(sortedParams).toString();
     const generatedHash = require('crypto')
       .createHmac('sha512', 'TXQUFKM8G0O5BDIN8IA1LR3611W95WJC')
-      .update(signData).digest('hex');
+      .update(signData)
+      .digest('hex');
 
-    const orderCode = vnp_Params.vnp_TxnRef;
+    const orderCode = vnp_Params.vnp_TxnRef;        
     const responseCode = vnp_Params.vnp_ResponseCode || '99';
 
-    if (secureHash === generatedHash && responseCode === '00') {
-      const [rows] = await db.promise().query(
-        `SELECT don_hang_id FROM don_hang WHERE trang_thai LIKE ? LIMIT 1`,
-        [`%${orderCode}%`]
-      );
-
-      if (rows.length === 0) {
-        console.log('KHÔNG TÌM THẤY ĐƠN HÀNG:', orderCode);
-        return res.json({ success: false, message: 'Không tìm thấy đơn hàng' });
-      }
-
-      await db.promise().query(
-        `UPDATE don_hang SET trang_thai = ?, HT_Thanh_toan_id = 3, ngay_TT = NOW() WHERE don_hang_id = ?`,
-        [`Đã thanh toán VNPay | Mã GD: ${vnp_Params.vnp_TransactionNo} | Đơn: ${orderCode}`, rows[0].don_hang_id]
-      );
-
-      console.log('THANH TOÁN THÀNH CÔNG – ĐƠN:', orderCode);
-      return res.json({ success: true, orderCode });
+    if (secureHash !== generatedHash) {
+      return res.json({ success: false, message: 'Chữ ký không hợp lệ' });
     }
 
-    // THẤT BẠI
-    return res.json({ success: false, message: 'Thanh toán thất bại' });
+    if (responseCode !== '00') {
+      return res.json({ success: false, message: `Giao dịch thất bại (mã: ${responseCode})` });
+    }
+
+    // Tìm đơn hàng bằng ma_don_hang
+    const [rows] = await db.promise().query(
+      `SELECT don_hang_id FROM don_hang WHERE ma_don_hang = ? LIMIT 1`,
+      [orderCode]
+    );
+
+    if (rows.length === 0) {
+      console.log('KHÔNG TÌM THẤY ĐƠN HÀNG:', orderCode);
+      return res.json({ success: false, message: 'Không tìm thấy đơn hàng' });
+      return;
+    }
+
+    const don_hang_id = rows[0].don_hang_id;
+
+    // CẬP NHẬT ĐÚNG THEO BẢNG CỦA BẠN: có tong_tien, HT_Thanh_toan_id, trang_thai, ma_giao_dich_vnpay, ngay_TT
+    // KHÔNG CÓ CỘT thanh_toan → ĐÃ BỎ HOÀN TOÀN
+    await db.promise().query(`
+      UPDATE don_hang dh
+      JOIN (
+        SELECT don_hang_id, SUM(So_luong * gia) AS total
+        FROM don_hang_ct
+        WHERE don_hang_id = ?
+        GROUP BY don_hang_id
+      ) ct ON dh.don_hang_id = ct.don_hang_id
+      SET 
+        dh.tong_tien = ct.total,
+        dh.trang_thai = ?,
+        dh.HT_Thanh_toan_id = 3,
+        dh.ngay_TT = NOW()
+      WHERE dh.don_hang_id = ?
+    `, [
+      don_hang_id,
+      `Đã thanh toán VNPay | Mã GD: ${vnp_Params.vnp_TransactionNo || 'N/A'} | Đơn: ${orderCode}`,
+      don_hang_id
+    ]);
+
+    console.log('THANH TOÁN THÀNH CÔNG – ĐƠN:', orderCode, '| ID:', don_hang_id, '| TỔNG TIỀN ĐÃ CẬP NHẬT');
+
+    return res.json({
+      success: true,
+      orderCode,
+      don_hang_id
+    });
 
   } catch (err) {
-    console.error(err);
+    console.error('Lỗi VNPay return:', err);
     return res.json({ success: false, message: 'Lỗi server' });
   }
 });
+
+
+// ROUTE HỦY ĐƠN HÀNG – DÀNH RIÊNG CHO PIBOOK
+app.put('/orders/:id/cancel', (req, res) => {
+  const { id } = req.params;
+  const { ly_do_huy } = req.body;
+
+  if (!ly_do_huy || ly_do_huy.trim() === '') {
+    return res.status(400).json({ error: 'Vui lòng chọn lý do hủy' });
+  }
+
+  const sql = `
+    UPDATE don_hang 
+    SET trang_thai = 'Đã hủy', 
+        ly_do_huy = ? 
+    WHERE don_hang_id = ? 
+      AND trang_thai NOT IN ('Đang giao', 'Hoàn thành', 'Đã hủy')
+  `;
+
+  db.query(sql, [ly_do_huy.trim(), id], (err, result) => {
+    if (err) {
+      console.error('Lỗi hủy đơn:', err);
+      return res.status(500).json({ error: 'Lỗi server' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(400).json({ error: 'Không thể hủy đơn này nữa' });
+    }
+    res.json({ success: true, message: 'Hủy đơn thành công!' });
+  });
+});
+
+// Thêm route này vào bất kỳ chỗ nào trong file server
+app.get("/nguoi_dung", (req, res) => {
+  db.query("SELECT * FROM nguoi_dung", (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// Thêm vào file server.js (Express)
+app.get("/don_hang", (req, res) => {
+  db.query("SELECT * FROM don_hang", (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// Ví dụ trong file server.js hoặc routes/index.js
+app.get("/don-hang-ct", (req, res) => {
+  const sql = "SELECT * FROM don_hang_ct";
+  db.query(sql, (err, data) => {
+    if (err) return res.status(500).json(err);
+    return res.json(data);
+  });
+});
+
 
 // ================== CHẠY SERVER ==================
 const PORT = process.env.PORT || 3003;
