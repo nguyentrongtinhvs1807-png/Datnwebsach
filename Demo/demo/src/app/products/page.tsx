@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Book {
   sach_id: number;
@@ -18,58 +19,52 @@ interface Book {
   an_hien?: number;
 }
 
-
 const PRODUCTS_PER_PAGE = 12;
-
-
 
 const buttonBaseStyle = {
   width: "50px",
   height: "50px",
-  borderRadius: "10px", 
+  borderRadius: "10px",
   border: "none",
   padding: "0",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  flexGrow: 1, 
+  flexGrow: 1,
 };
 
 const viewButtonStyle = {
   ...buttonBaseStyle,
-  background: "#93c5fd", 
-  color: "#1e40af", 
+  background: "#93c5fd",
+  color: "#1e40af",
 };
 
 const buyButtonStyle = {
   ...buttonBaseStyle,
-  background: "#fcd34d", 
-  color: "#92400e", 
+  background: "#fcd34d",
+  color: "#92400e",
 };
 
 const cartButtonStyle = {
   ...buttonBaseStyle,
-  background: "#6ee7b7", 
-  color: "#047857", 
+  background: "#6ee7b7",
+  color: "#047857",
 };
-// =========================================================================
-
 
 export default function ProductList() {
   const [books, setBooks] = useState<Book[]>([]);
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("");
-  
-  // THAY ĐỔI: Chuyển từ visibleCount sang currentPage
-  const [currentPage, setCurrentPage] = useState(1); 
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Bộ lọc
   const [selectedAuthors, setSelectedAuthors] = useState<string[]>([]);
   const [selectedPublishers, setSelectedPublishers] = useState<string[]>([]);
   const [selectedBookTypes, setSelectedBookTypes] = useState<string[]>([]);
 
+  const router = useRouter();
+
   useEffect(() => {
-    // Logic Fetch sách và tìm kiếm từ URL/Header
     const savedQuery = sessionStorage.getItem("searchQueryFromHeader");
     if (savedQuery) {
       setSearch(savedQuery);
@@ -80,30 +75,23 @@ export default function ProductList() {
     const urlQuery = params.get("q");
     if (urlQuery) setSearch(decodeURIComponent(urlQuery));
 
-    // Fetch sách
     fetch("http://localhost:3003/books")
       .then((res) => res.json())
       .then((data: any) => {
         if (Array.isArray(data)) {
           const unique = Array.from(new Map(data.map((b: any) => [b.sach_id, b])).values()) as Book[];
-      
-          // LỌC SÁCH ĐÃ BỊ ẨN (an_hien = 0)
           const visibleBooks = unique.filter(book => book.an_hien !== 0);
-      
           setBooks(visibleBooks);
         }
       })
       .catch((err) => console.error(err));
-      
-    // Quan trọng: Khi filter/search thay đổi, quay về trang 1
-    setCurrentPage(1); 
-  }, []); // Cần thêm search, selectedAuthors, selectedPublishers, selectedBookTypes vào dependency array nếu bạn muốn reset trang khi filter thay đổi.
 
-  // Khi bộ lọc thay đổi, reset về trang 1
+    setCurrentPage(1);
+  }, []);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search, selectedAuthors, selectedPublishers, selectedBookTypes, sortOrder]);
-
 
   const uniqueAuthors = Array.from(new Set(books.map((b) => b.ten_tac_gia))).sort();
   const uniquePublishers = Array.from(new Set(books.map((b) => b.ten_NXB))).sort();
@@ -130,43 +118,38 @@ export default function ProductList() {
       return 0;
     });
 
-  // LOGIC PHÂN TRANG MỚI
   const totalPages = Math.ceil(filteredBooks.length / PRODUCTS_PER_PAGE);
   const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
   const endIndex = startIndex + PRODUCTS_PER_PAGE;
-  
-  // THAY ĐỔI: Lấy sách chỉ trong trang hiện tại
-  const visibleBooks = filteredBooks.slice(startIndex, endIndex); 
+  const visibleBooks = filteredBooks.slice(startIndex, endIndex);
 
   const formatPrice = (price: number) => Math.round(price).toLocaleString("vi-VN") + "đ";
 
-  // Hàm xử lý Pagination (Giả định sử dụng React-Bootstrap Pagination hoặc tự làm)
   const renderPagination = () => {
     if (totalPages <= 1) return null;
 
     const items = [];
-    const maxPageDisplay = 5; // Hiển thị tối đa 5 nút trang
+    const maxPageDisplay = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxPageDisplay / 2));
     let endPage = Math.min(totalPages, startPage + maxPageDisplay - 1);
 
     if (endPage - startPage + 1 < maxPageDisplay) {
-        startPage = Math.max(1, endPage - maxPageDisplay + 1);
+      startPage = Math.max(1, endPage - maxPageDisplay + 1);
     }
-
 
     for (let i = startPage; i <= endPage; i++) {
       items.push(
         <li key={i} className={`page-item ${i === currentPage ? 'active' : ''}`}>
-          <a 
-            className="page-link shadow-sm fw-bold" 
-            href="#" 
+          <a
+            className="page-link shadow-sm fw-bold"
+            href="#"
             onClick={(e) => {
               e.preventDefault();
               setCurrentPage(i);
-              window.scrollTo({ top: 0, behavior: 'smooth' }); // Cuộn lên đầu trang
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            style={{ 
-              background: i === currentPage ? "#fcd34d" : "#fff", // Màu vàng tươi cho trang hiện tại
+            style={{
+              background: i === currentPage ? "#fcd34d" : "#fff",
               borderColor: i === currentPage ? "#fcd34d" : "#dee2e6",
               color: i === currentPage ? "#92400e" : "#000",
             }}
@@ -176,11 +159,10 @@ export default function ProductList() {
         </li>
       );
     }
-    
+
     return (
       <nav aria-label="Product Page Navigation" className="mt-5">
         <ul className="pagination justify-content-center">
-          
           <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
             <a className="page-link" href="#" aria-label="Previous" onClick={(e) => { e.preventDefault(); if (currentPage > 1) setCurrentPage(currentPage - 1); }}>
               <span aria-hidden="true">&laquo;</span>
@@ -188,77 +170,112 @@ export default function ProductList() {
           </li>
 
           {items}
-          
+
           <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
             <a className="page-link" href="#" aria-label="Next" onClick={(e) => { e.preventDefault(); if (currentPage < totalPages) setCurrentPage(currentPage + 1); }}>
               <span aria-hidden="true">&raquo;</span>
             </a>
           </li>
-
         </ul>
       </nav>
     );
   };
-  
-  // Các hàm handleAddToCart và handleBuyNow (Giữ nguyên)
-  const handleAddToCart = (book: Book) => {
-    // ... logic giữ nguyên
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-    const exist = cart.find((x: any) => x.id === book.sach_id.toString());
 
-    if (exist) exist.quantity += 1;
-    else {
-      cart.push({
+  // === THÊM VÀO GIỎ HÀNG (KHÔNG CẦN ĐĂNG NHẬP) ===
+  const handleAddToCart = (book: Book) => {
+    try {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const exist = cart.find((x: any) => x.id === book.sach_id.toString());
+
+      if (exist) exist.quantity += 1;
+      else {
+        cart.push({
+          id: book.sach_id.toString(),
+          name: book.ten_sach,
+          price: book.gia_sach - book.gg_sach,
+          image: book.image || "/image/default-book.jpg",
+          quantity: 1,
+        });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(cart));
+      window.dispatchEvent(new Event("cart-update"));
+
+      // Notification đẹp
+      const toast = document.createElement("div");
+      toast.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Đã thêm <strong>"${book.ten_sach}"</strong> vào giỏ hàng!`;
+      Object.assign(toast.style, {
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        background: "linear-gradient(135deg, #10b981, #059669)",
+        color: "white",
+        padding: "16px 24px",
+        borderRadius: "16px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+        zIndex: 9999,
+        fontWeight: "bold",
+        fontSize: "1rem",
+        display: "flex",
+        alignItems: "center",
+        animation: "slideIn 0.4s ease",
+      });
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(100%)";
+        setTimeout(() => toast.remove(), 500);
+      }, 2500);
+    } catch (err) {
+      console.error("Lỗi thêm giỏ hàng:", err);
+    }
+  };
+
+  // === MUA NGAY – BẮT BUỘC ĐĂNG NHẬP ===
+  const handleBuyNow = (book: Book) => {
+    const storedUser = localStorage.getItem("user");
+
+    if (!storedUser) {
+      // Chưa đăng nhập → thông báo + chuyển sang đăng nhập
+      const toast = document.createElement("div");
+      toast.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Vui lòng đăng nhập để mua ngay!</strong>`;
+      Object.assign(toast.style, {
+        position: "fixed",
+        top: "20px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "linear-gradient(135deg, #f97316, #ea580c)",
+        color: "white",
+        padding: "16px 32px",
+        borderRadius: "16px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+        zIndex: 9999,
+        fontWeight: "bold",
+        fontSize: "1.1rem",
+        textAlign: "center",
+      });
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+
+      router.push("/auth/dangnhap");
+      return;
+    }
+
+    // Đã đăng nhập → cho mua ngay
+    try {
+      const item = {
         id: book.sach_id.toString(),
         name: book.ten_sach,
         price: book.gia_sach - book.gg_sach,
         image: book.image || "/image/default-book.jpg",
         quantity: 1,
-      });
+      };
+      localStorage.setItem("checkoutItems", JSON.stringify([item]));
+      router.push("/checkout");
+    } catch (error) {
+      console.error("Lỗi mua ngay:", error);
     }
-
-    localStorage.setItem("cart", JSON.stringify(cart));
-    window.dispatchEvent(new Event("cart-update"));
-
-    const toast = document.createElement("div");
-    toast.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i>Đã thêm <strong>"${book.ten_sach}"</strong> vào giỏ hàng!`;
-    Object.assign(toast.style, {
-      position: "fixed",
-      top: "20px",
-      right: "20px",
-      background: "linear-gradient(135deg, #10b981, #059669)",
-      color: "white",
-      padding: "16px 24px",
-      borderRadius: "16px",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
-      zIndex: 9999,
-      fontWeight: "bold",
-      fontSize: "1rem",
-      display: "flex",
-      alignItems: "center",
-      animation: "slideIn 0.4s ease",
-    });
-    document.body.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = "0";
-      toast.style.transform = "translateX(100%)";
-      setTimeout(() => toast.remove(), 500);
-    }, 2500);
   };
-
-  const handleBuyNow = (book: Book) => {
-    // ... logic giữ nguyên
-    const item = {
-      id: book.sach_id.toString(),
-      name: book.ten_sach,
-      price: book.gia_sach - book.gg_sach,
-      image: book.image || "/image/default-book.jpg",
-      quantity: 1,
-    };
-    localStorage.setItem("checkoutItems", JSON.stringify([item]));
-    window.location.href = "/checkout";
-  };
-
 
   return (
     <>
@@ -266,12 +283,10 @@ export default function ProductList() {
         {/* Header */}
         <div className="text-center mb-5 pt-4">
           <h1 className="fw-bold display-5" style={{ color: "#d97706" }}>
-            Kho Sách Pibbok Nơi Khỏi Đầu Của Thành Công 
+            Kho Sách Pibbok – Nơi Khởi Đầu Của Thành Công
           </h1>
-          
         </div>
-        
-        {/* Tìm kiếm + Sắp xếp (Giữ nguyên) */}
+
         {/* Tìm kiếm + Sắp xếp */}
         <div className="row justify-content-center mb-5">
           <div className="col-lg-8">
@@ -291,21 +306,20 @@ export default function ProductList() {
           </div>
           <div className="col-lg-3 mt-3 mt-lg-0">
             <select
-              // THAY ĐỔI: Thêm class py-3 để khớp với padding của ô tìm kiếm
-              className="form-select form-select-lg shadow py-3" 
+              className="form-select form-select-lg shadow py-3"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
               style={{ borderRadius: "30px" }}
             >
               <option value="">Sắp xếp theo giá</option>
-              <option value="asc"> Thấp đến Cao</option>
+              <option value="asc">Thấp đến Cao</option>
               <option value="desc">Cao đến Thấp</option>
             </select>
           </div>
         </div>
 
         <div className="row g-4">
-          {/* Bộ lọc bên trái (Giữ nguyên) */}
+          {/* Bộ lọc bên trái */}
           <div className="col-lg-3">
             <div className="card border-0 shadow-lg sticky-top" style={{ top: "20px", borderRadius: "20px" }}>
               <div className="card-body p-4">
@@ -368,15 +382,14 @@ export default function ProductList() {
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-12px)")}
                       onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
-                      onClick={() => (window.location.href = `/products/${book.sach_id}`)}
+                      onClick={() => router.push(`/products/${book.sach_id}`)}
                     >
-                      {/* Ảnh + Badge (Giữ nguyên đã bóp nhỏ) */}
                       <div className="position-relative">
                         <img
                           src={book.image || "/image/default-book.jpg"}
                           alt={book.ten_sach}
                           style={{
-                            height: "200px", 
+                            height: "200px",
                             width: "100%",
                             objectFit: "contain",
                             padding: "20px",
@@ -397,31 +410,28 @@ export default function ProductList() {
                         )}
                       </div>
 
-                      {/* Card Body (Giữ nguyên đã bóp nhỏ) */}
-                      <div className="card-body d-flex flex-column p-3 text-center"> 
-                        <h6 
-                          className="fw-bold mb-2" 
-                          style={{ 
-                            height: "40px", 
-                            overflow: "hidden", 
-                            fontSize: "1.05rem" 
+                      <div className="card-body d-flex flex-column p-3 text-center">
+                        <h6
+                          className="fw-bold mb-2"
+                          style={{
+                            height: "40px",
+                            overflow: "hidden",
+                            fontSize: "1.05rem"
                           }}
                         >
                           {book.ten_sach}
                         </h6>
 
-                        {/* TÊN TÁC GIẢ MÀU XANH LÁ ĐẸP */}
-                        <p 
-                          className="fw-semibold mb-2" 
-                          style={{ 
-                            color: "#059669", 
-                            fontSize: "0.98rem" 
+                        <p
+                          className="fw-semibold mb-2"
+                          style={{
+                            color: "#059669",
+                            fontSize: "0.98rem"
                           }}
                         >
                           {book.ten_tac_gia}
                         </p>
 
-                        {/* Giá */}
                         {hasDiscount ? (
                           <>
                             <h5 className="text-danger fw-bold">{formatPrice(finalPrice)}</h5>
@@ -431,18 +441,17 @@ export default function ProductList() {
                           <h5 className="text-primary fw-bold">{formatPrice(book.gia_sach)}</h5>
                         )}
 
-                        {/* 3 NÚT ICON (Giữ nguyên) */}
-                        <div className="d-flex justify-content-center gap-3 mt-3"> 
+                        <div className="d-flex justify-content-center gap-3 mt-3">
                           <button
                             className="btn shadow-sm fw-bold p-2"
                             style={viewButtonStyle}
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.location.href = `/products/${book.sach_id}`;
+                              router.push(`/products/${book.sach_id}`);
                             }}
                             title="Xem chi tiết"
                           >
-                            <i className="bi bi-search fs-5"></i> 
+                            <i className="bi bi-search fs-5"></i>
                           </button>
 
                           <button
@@ -454,7 +463,7 @@ export default function ProductList() {
                             }}
                             title="Mua ngay"
                           >
-                            <i className="bi bi-lightning-fill fs-5"></i> 
+                            <i className="bi bi-lightning-fill fs-5"></i>
                           </button>
 
                           <button
@@ -476,7 +485,6 @@ export default function ProductList() {
               })}
             </div>
 
-            {/* THAY THẾ NÚT XEM THÊM BẰNG PHÂN TRANG */}
             {visibleBooks.length > 0 && renderPagination()}
 
             {visibleBooks.length === 0 && (
@@ -489,7 +497,6 @@ export default function ProductList() {
         </div>
       </div>
 
-      {/* CSS Animation */}
       <style jsx>{`
         @keyframes slideIn {
           from { transform: translateX(100%); opacity: 0; }

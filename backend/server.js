@@ -5,27 +5,64 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const QRCode = require("qrcode");
 const fs = require("fs");
-const path = require('path');
+const path = require("path");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const multer = require("multer"); // Đã cài bằng npm install multer
 
-const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require ('vnpay');
+const { VNPay } = require("vnpay");
 
 const app = express();
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
+// ================== TĂNG GIỚI HẠN BODY ĐỂ TRÁNH PayloadTooLargeError ==================
+app.use(express.json({ limit: "10mb" })); // Cho phép JSON lớn đến 10MB
+app.use(express.urlencoded({ limit: "10mb", extended: true })); // Cho form data
 
+// ================== CẤU HÌNH MULTER UPLOAD ẢNH ==================
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Giới hạn 5MB mỗi file
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error("Chỉ chấp nhận file ảnh (jpeg, jpg, png, gif, webp)!"));
+    }
+  },
+});
+
+// Phục vụ file tĩnh từ thư mục uploads và images
+app.use("/uploads", express.static(uploadDir));
+app.use("/images", express.static(path.join(__dirname, "public/images")));
+
+// ================== CẤU HÌNH CORS ==================
 app.use(cors({
-  origin: "http://localhost:3000", // Cho phép NextJS gọi
+  origin: "http://localhost:3000",
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 }));
 
-
-// FIX CORS – CHỈ 2 DÒNG NÀY LÀ XONG MÃI MÃI!!!
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -34,21 +71,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// ================== CẤU HÌNH CƠ BẢN ==================
-app.use(express.json());
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
-
-
 app.use(express.json());
 
-// ================== VNPAY KHỞI TẠO (CHỈ 1 LẦN) ==================
+// ================== VNPAY KHỞI TẠO ==================
 const vnpay = new VNPay({
   tmnCode: "D3BX5CIF",
   secureSecret: "TXQUFKM8G0O5BDIN8IA1LR3611W95WJC",
@@ -56,9 +81,6 @@ const vnpay = new VNPay({
   hashAlgorithm: "SHA512",
 });
 
-
-
-// Hàm format ngày chuẩn VNPay: yyyyMMddHHmmss
 const formatDate = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
   return (
@@ -90,17 +112,15 @@ db.connect((err) => {
   }
 });
 
-// ================== CẤU HÌNH GỬI MAIL – DÙNG MAILTRAP (khuyên dùng để test) ==================
+// ================== CẤU HÌNH GỬI MAIL ==================
 const transporter = nodemailer.createTransport({
   host: "sandbox.smtp.mailtrap.io",
   port: 2525,
   auth: {
-    user: "5e7e7e7e7e7e7e",    // Thay bằng username Mailtrap của bạn
-    pass: "5e7e7e7e7e7e7e"     // Thay bằng password Mailtrap của bạn
+    user: "5e7e7e7e7e7e7e",
+    pass: "5e7e7e7e7e7e7e"
   }
 });
-
-
 
 // ================== MIDDLEWARE XÁC THỰC JWT ==================
 function authenticateToken(req, res, next) {
@@ -123,6 +143,31 @@ function authenticateToken(req, res, next) {
     next();
   });
 }
+
+app.post("/upload-image", upload.single("image"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "Không có file ảnh được upload!" });
+  }
+
+  const imageUrl = `/uploads/${req.file.filename}`;
+  res.json({ imageUrl });
+});
+
+app.get("/sach/:id/hinh", async (req, res) => {
+  const { id } = req.params;
+
+  const [rows] = await db.query(
+    "SELECT URL FROM hinh WHERE sach_id = ? LIMIT 1",
+    [id]
+  );
+
+  if (rows.length === 0) {
+    return res.json({});
+  }
+
+  res.json({ URL: rows[0].URL });
+});
+
 
 // ================== API MÃ GIẢM GIÁ ==================
 app.get("/api/ma-giam-gia", (req, res) => {
@@ -426,42 +471,90 @@ app.post("/comments", (req, res) => {
 });
 // ================== AUTH ==================
 
-//  Đăng ký tài khoản (phiên bản DEV - không mã hóa mật khẩu)
-app.post("/auth/register", (req, res) => {
-  const { ho_ten, email, mat_khau } = req.body;
+// API Đăng ký tài khoản - ĐÃ THÊM ĐỊA CHỈ VÀ NGÀY SINH
+app.post("/auth/register", async (req, res) => {
+  const { ho_ten, email, so_dien_thoai, dia_chi, ngay_sinh, mat_khau } = req.body;
 
-  if (!ho_ten || !email || !mat_khau) {
-    return res.status(400).json({ message: "⚠️ Thiếu thông tin bắt buộc" });
+  // Kiểm tra các trường bắt buộc
+  if (!ho_ten || !email || !so_dien_thoai || !mat_khau) {
+    return res.status(400).json({
+      message: "⚠️ Vui lòng nhập đầy đủ: Họ tên, Email, Số điện thoại và Mật khẩu",
+    });
   }
 
-  const checkEmailSQL = "SELECT nguoi_dung_id FROM nguoi_dung WHERE email = ? LIMIT 1";
-  db.query(checkEmailSQL, [email], (err, results) => {
-    if (err) {
-      console.error(" Lỗi truy vấn email:", err);
-      return res.status(500).json({ message: " Lỗi máy chủ khi kiểm tra email" });
-    }
+  // Validate định dạng
+  if (!/^[\w.-]+@[\w.-]+\.\w+$/.test(email.trim())) {
+    return res.status(400).json({ message: "Email không hợp lệ" });
+  }
 
-    if (results.length > 0) {
-      return res.status(400).json({ message: " Email đã tồn tại" });
-    }
+  const phone = so_dien_thoai.trim();
+  if (!/^0[3|5|7|8|9][0-9]{8}$/.test(phone)) {
+    return res.status(400).json({
+      message: "Số điện thoại không hợp lệ (phải có 10 số, bắt đầu bằng 03, 05, 07, 08, 09)",
+    });
+  }
 
-    //  Lưu mật khẩu thường, không mã hóa
-    const insertSQL = `
-      INSERT INTO nguoi_dung (Ten, email, mat_khau, role)
-      VALUES (?, ?, ?, 'user')
+  if (mat_khau.length < 6) {
+    return res.status(400).json({ message: "Mật khẩu phải từ 6 ký tự trở lên" });
+  }
+
+  try {
+    // Kiểm tra trùng email hoặc số điện thoại
+    const checkSQL = `
+      SELECT nguoi_dung_id FROM nguoi_dung 
+      WHERE email = ? OR so_dien_thoai = ? 
+      LIMIT 1
     `;
-    db.query(insertSQL, [ho_ten, email, mat_khau], (err2, result) => {
-      if (err2) {
-        console.error(" Lỗi khi thêm người dùng:", err2);
-        return res.status(500).json({ message: " Lỗi khi tạo tài khoản" });
+
+    db.query(checkSQL, [email.trim(), phone], async (err, results) => {
+      if (err) {
+        console.error("Lỗi kiểm tra trùng:", err);
+        return res.status(500).json({ message: "Lỗi máy chủ" });
       }
 
-      res.json({
-        message: " Đăng ký thành công (mật khẩu lưu dạng thường)",
-        userId: result.insertId,
-      });
+      if (results.length > 0) {
+        return res.status(400).json({
+          message: "Email hoặc số điện thoại đã được sử dụng",
+        });
+      }
+
+      // Mã hóa mật khẩu
+      const hashedPassword = await bcrypt.hash(mat_khau, 10);
+
+      // INSERT VÀO DATABASE - THÊM dia_chi và ngay_sinh
+      const insertSQL = `
+        INSERT INTO nguoi_dung 
+        (Ten, email, so_dien_thoai, dia_chi, ngay_sinh, mat_khau, role, is_hidden)
+        VALUES (?, ?, ?, ?, ?, ?, 'user', 0)
+      `;
+
+      db.query(
+        insertSQL,
+        [
+          ho_ten.trim(),
+          email.trim(),
+          phone,
+          dia_chi ? dia_chi.trim() : null,   // Nếu không nhập → NULL
+          ngay_sinh || null,                 // Nếu không chọn ngày → NULL
+          hashedPassword,
+        ],
+        (err2, result) => {
+          if (err2) {
+            console.error("Lỗi tạo tài khoản:", err2);
+            return res.status(500).json({ message: "Không thể tạo tài khoản. Vui lòng thử lại." });
+          }
+
+          res.status(201).json({
+            message: "Đăng ký thành công! Bạn có thể đăng nhập ngay.",
+            userId: result.insertId,
+          });
+        }
+      );
     });
-  });
+  } catch (error) {
+    console.error("Lỗi hệ thống đăng ký:", error);
+    res.status(500).json({ message: "Lỗi hệ thống. Vui lòng thử lại sau." });
+  }
 });
 
 
@@ -488,14 +581,14 @@ app.post("/auth/login", async (req, res) => {
 
     const user = results[0];
 
-    // KIỂM TRA MẬT KHẨU: nếu đã bị băm thì dùng bcrypt, nếu chưa thì so sánh trực tiếp
+    // KIỂM TRA MẬT KHẨU
     let matKhauDung = false;
 
-    // Nếu mật khẩu trong DB dài > 50 ký tự → chắc chắn đã được bcrypt
     if (String(user.mat_khau).length > 50) {
+      // Mật khẩu đã được bcrypt
       matKhauDung = await bcrypt.compare(String(mat_khau), String(user.mat_khau));
     } else {
-      // Trường hợp cũ: mật khẩu chưa băm (123456)
+      // Mật khẩu cũ chưa băm
       matKhauDung = String(mat_khau).trim() === String(user.mat_khau).trim();
     }
 
@@ -503,22 +596,83 @@ app.post("/auth/login", async (req, res) => {
       return res.status(401).json({ message: "Sai mật khẩu" });
     }
 
-    // Tạo token
+    // Tạo token (giữ nguyên như cũ)
     const token = jwt.sign(
       { id: user.nguoi_dung_id, role: user.role, email: user.email },
       JWT_SECRET,
       { expiresIn: "2h" }
     );
 
+    // TRẢ VỀ ĐẦY ĐỦ THÔNG TIN USER CHO FRONTEND
     res.json({
       message: "Đăng nhập thành công!",
-      user: {
-        id: user.nguoi_dung_id,
-        ten: user.Ten,
-        email: user.email,
-        role: user.role,
-      },
       token,
+      user: {
+        nguoi_dung_id: user.nguoi_dung_id,
+        ho_ten: user.ho_ten || "",                    // Họ và tên đầy đủ
+        email: user.email,
+        so_dien_thoai: user.so_dien_thoai || "",      // ← SỐ ĐIỆN THOẠI (rất quan trọng!)
+        dia_chi: user.dia_chi || "",                  // ← Địa chỉ (tự động điền nếu có)
+        role: user.role,
+        is_hidden: user.is_hidden || 0,
+      },
+    });
+  });
+});
+
+
+// API lấy thông tin người dùng theo ID (đã đăng nhập)
+app.get("/auth/user/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ message: "Thiếu ID người dùng" });
+  }
+
+  const sql = `
+    SELECT 
+      nguoi_dung_id,
+      Ten AS ten,
+      email,
+      so_dien_thoai,
+      dia_chi,
+      ngay_sinh,
+      mat_khau,
+      role,
+      is_hidden
+    FROM nguoi_dung 
+    WHERE nguoi_dung_id = ? 
+    LIMIT 1
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error("Lỗi truy vấn user:", err);
+      return res.status(500).json({ message: "Lỗi máy chủ" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    const user = results[0];
+
+    // Che mật khẩu trước khi trả về (an toàn)
+    const maskedUser = {
+      nguoi_dung_id: user.nguoi_dung_id,
+      ten: user.ten || "",
+      email: user.email || "",
+      so_dien_thoai: user.so_dien_thoai || "",
+      dia_chi: user.dia_chi || "",
+      ngay_sinh: user.ngay_sinh || null,
+      role: user.role || "user",
+      is_hidden: user.is_hidden || 0,
+      has_password: !!user.mat_khau, // Chỉ báo có mật khẩu hay không, không trả thật
+    };
+
+    res.json({
+      success: true,
+      user: maskedUser,
     });
   });
 });
@@ -1167,41 +1321,6 @@ app.get("/orders/:id/details", (req, res) => {
 });
 
 
-// API CẬP NHẬT TỔNG TIỀN – ĐÃ SỬA HOÀN HẢO CHO PIBOOK
-app.post("/api/update-order-total", (req, res) => {
-  const { orderId } = req.body;
-
-  if (!orderId) {
-  return res.status(400).json({ success: false, message: "Thiếu orderId" });
-  }
-
-  const sql = `
-    UPDATE don_hang dh
-    JOIN (
-      SELECT don_hang_id, SUM(So_luong * gia) AS total
-      FROM don_hang_ct
-      WHERE don_hang_id = ?
-      GROUP BY don_hang_id
-    ) ct ON dh.don_hang_id = ct.don_hang_id
-    SET dh.tong_tien = ct.total
-    WHERE dh.don_hang_id = ?
-  `;
-
-  db.query(sql, [orderId, orderId], (err, result) => {
-    if (err) {
-      console.error("Lỗi cập nhật tổng tiền:", err);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-
-    if (result.affectedRows === 0) {
-      return res.json({ success: false, message: "Không tìm thấy đơn hàng" });
-    }
-
-    console.log(`Cập nhật tổng tiền thành công cho đơn #${orderId}`);
-    res.json({ success: true });
-  });
-});
-
 // ================== API: Xóa đơn hàng ==================
 app.delete("/orders/:id", (req, res) => {
   const { id } = req.params;
@@ -1252,6 +1371,46 @@ app.put("/orders/:id/status", (req, res) => {
   });
 });
 
+// API: Lấy chi tiết 1 đơn hàng – HOÀN HẢO CHO BẢNG don_hang CỦA BẠN
+app.get("/orders/:id", (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT 
+      don_hang_id,
+      DC_GH,
+      tong_tien,
+      trang_thai,
+      HT_Thanh_toan_id,
+      ngay_dat,
+      giam_gia_id
+    FROM don_hang 
+    WHERE don_hang_id = ?
+  `;
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error("Lỗi truy vấn đơn hàng:", err);
+      return res.status(500).json({ error: "Lỗi server" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    }
+
+    const order = results[0];
+    res.json({
+      don_hang_id: order.don_hang_id,
+      DC_GH: order.DC_GH || "",
+      tong_tien: Number(order.tong_tien || 0),
+      trang_thai: order.trang_thai || "Chờ xác nhận",
+      HT_Thanh_toan_id: Number(order.HT_Thanh_toan_id || 1),
+      ngay_dat: order.ngay_dat,
+      giam_gia: order.giam_gia_id ? Number(order.giam_gia_id) : 0
+      // Không có tam_tinh, phi_ship → frontend sẽ xử lý mặc định = 0
+    });
+  });
+});
 
 //  Lấy tất cả voucher
 app.get("/api/voucher", (req, res) => {
@@ -1786,7 +1945,7 @@ app.get("/don_hang", (req, res) => {
   });
 });
 
-// Ví dụ trong file server.js hoặc routes/index.js
+
 app.get("/don-hang-ct", (req, res) => {
   const sql = "SELECT * FROM don_hang_ct";
   db.query(sql, (err, data) => {
@@ -1794,6 +1953,8 @@ app.get("/don-hang-ct", (req, res) => {
     return res.json(data);
   });
 });
+
+
 
 
 // ================== CHẠY SERVER ==================

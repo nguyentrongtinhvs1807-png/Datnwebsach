@@ -4,11 +4,16 @@ import { Button } from "react-bootstrap";
 import { ISach } from "@/components/cautrucdata";
 import ProductModal from "./product.modal";
 
+const ITEMS_PER_PAGE = 8;
+
 const AdminProduct = () => {
   const [sachs, setSachs] = useState<ISach[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editSach, setEditSach] = useState<ISach | null>(null);
   const [search, setSearch] = useState("");
+
+  // phân trang
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Lấy danh sách sách
   const fetchSach = async () => {
@@ -25,9 +30,14 @@ const AdminProduct = () => {
     fetchSach();
   }, []);
 
-  // ẨN SÁCH – ĐÃ SỬA CHẠY NGON 100%
+  // reset trang khi search
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  // ẨN SÁCH
   const handleHide = async (id: number) => {
-    if (!confirm("Bạn có chắc muốn ẩn sách này không?\nSách sẽ không hiển thị trên website nhưng vẫn còn trong database.")) return;
+    if (!confirm("Bạn có chắc muốn ẩn sách này không?")) return;
 
     try {
       const res = await fetch(`http://localhost:3003/sach/${id}`, {
@@ -37,19 +47,19 @@ const AdminProduct = () => {
       const result = await res.json();
 
       if (res.ok && result.success) {
-        // Cập nhật state ngay lập tức (không cần đợi fetch lại)
-        setSachs(prev => prev.map(s => s.sach_id === id ? { ...s, an_hien: 0 } : s));
+        setSachs(prev =>
+          prev.map(s => (s.sach_id === id ? { ...s, an_hien: 0 } : s))
+        );
         alert("Đã ẩn sách thành công!");
       } else {
         alert(result.message || "Lỗi khi ẩn sách");
       }
-    } catch (error) {
-      console.error("Lỗi kết nối:", error);
+    } catch {
       alert("Không thể kết nối đến server!");
     }
   };
 
-  // KHÔI PHỤC SÁCH – ĐÃ SỬA CHẠY NGON 100%
+  // KHÔI PHỤC SÁCH
   const handleRestore = async (id: number) => {
     if (!confirm("Bạn có chắc muốn khôi phục sách này không?")) return;
 
@@ -61,13 +71,14 @@ const AdminProduct = () => {
       const result = await res.json();
 
       if (res.ok && result.success) {
-        setSachs(prev => prev.map(s => s.sach_id === id ? { ...s, an_hien: 1 } : s));
+        setSachs(prev =>
+          prev.map(s => (s.sach_id === id ? { ...s, an_hien: 1 } : s))
+        );
         alert("Đã khôi phục sách thành công!");
       } else {
         alert(result.message || "Lỗi khi khôi phục sách");
       }
-    } catch (error) {
-      console.error("Lỗi kết nối:", error);
+    } catch {
       alert("Không thể kết nối đến server!");
     }
   };
@@ -77,7 +88,7 @@ const AdminProduct = () => {
     setShowModal(true);
   };
 
-  // Lọc theo ô tìm kiếm
+  // SEARCH
   const filteredSachs = sachs.filter((sach) => {
     const keyword = search.toLowerCase();
     return (
@@ -86,6 +97,14 @@ const AdminProduct = () => {
       sach.ten_NXB?.toLowerCase().includes(keyword)
     );
   });
+
+  // PAGINATION
+  const totalPages = Math.ceil(filteredSachs.length / ITEMS_PER_PAGE);
+
+  const paginatedSachs = filteredSachs.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div>
@@ -115,7 +134,7 @@ const AdminProduct = () => {
       </div>
 
       {/* Bảng sách */}
-      {filteredSachs.length === 0 ? (
+      {paginatedSachs.length === 0 ? (
         <div className="text-center py-5">
           <p className="text-muted fs-5">
             {search ? "Không tìm thấy sách nào phù hợp." : "Chưa có sách nào."}
@@ -126,49 +145,41 @@ const AdminProduct = () => {
           <table className="table table-hover align-middle mb-0">
             <thead style={{ background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)", color: "white" }}>
               <tr>
-                <th style={{ fontWeight: 600 }}>ID</th>
-                <th style={{ fontWeight: 600 }}>Tên sách</th>
-                <th style={{ fontWeight: 600 }}>Tác giả</th>
-                <th style={{ fontWeight: 600 }}>Nhà XB</th>
-                <th style={{ fontWeight: 600 }}>Giá (đ)</th>
-                <th style={{ fontWeight: 600 }}>Tồn kho</th>
-                <th style={{ fontWeight: 600 }}>Giảm giá (đ)</th>
-                <th style={{ fontWeight: 600 }}>Loại bìa</th>
-                <th style={{ fontWeight: 600 }}>Mô tả</th>
-                <th style={{ fontWeight: 600 }}>Thao tác</th>
+                <th>ID</th>
+                <th>Tên sách</th>
+                <th>Tác giả</th>
+                <th>Nhà XB</th>
+                <th>Giá</th>
+                <th>Tồn kho</th>
+                <th>Giảm giá</th>
+                <th>Loại bìa</th>
+                <th>Mô tả</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {filteredSachs.map((sach) => (
+              {paginatedSachs.map((sach) => (
                 <tr
                   key={sach.sach_id}
                   style={{
-                    transition: "background 0.2s",
                     opacity: sach.an_hien === 0 ? 0.6 : 1,
                     backgroundColor: sach.an_hien === 0 ? "#f8f9fa" : "white",
                   }}
                 >
-                  <td className="fw-semibold">
+                  <td>
                     {sach.sach_id}
                     {sach.an_hien === 0 && (
-                      <span className="badge bg-secondary ms-2" style={{ fontSize: "0.7rem" }}>
-                        Đã ẩn
-                      </span>
+                      <span className="badge bg-secondary ms-2">Đã ẩn</span>
                     )}
                   </td>
-                  <td className="fw-medium" style={{ color: "#21409A", maxWidth: "200px" }}>
-                    {sach.ten_sach}
-                  </td>
+                  <td className="fw-semibold text-primary">{sach.ten_sach}</td>
                   <td>{sach.ten_tac_gia}</td>
                   <td>{sach.ten_NXB}</td>
-                  <td className="text-danger fw-bold">
-                    {sach.gia_sach ? Number(sach.gia_sach).toLocaleString("vi-VN") + "đ" : "0đ"}
+                  <td className="fw-bold text-danger">
+                    {Number(sach.gia_sach || 0).toLocaleString("vi-VN")}đ
                   </td>
                   <td>
-                    <span
-                      className={`badge ${(sach.ton_kho_sach || 0) > 0 ? "bg-success" : "bg-danger"}`}
-                      style={{ padding: "6px 12px", borderRadius: "8px" }}
-                    >
+                    <span className={`badge ${sach.ton_kho_sach > 0 ? "bg-success" : "bg-danger"}`}>
                       {sach.ton_kho_sach || 0}
                     </span>
                   </td>
@@ -176,48 +187,22 @@ const AdminProduct = () => {
                     {sach.gg_sach > 0 ? Number(sach.gg_sach).toLocaleString("vi-VN") + "đ" : "-"}
                   </td>
                   <td>
-                    <span className="badge bg-info" style={{ padding: "6px 12px", borderRadius: "8px" }}>
-                      {sach.loai_bia || "N/A"}
-                    </span>
+                    <span className="badge bg-info">{sach.loai_bia}</span>
                   </td>
-                  <td style={{ maxWidth: "250px", wordBreak: "break-word" }}>
-                    <span className="text-muted small" title={sach.mo_ta}>
-                      {sach.mo_ta && sach.mo_ta.length > 50
-                        ? `${sach.mo_ta.substring(0, 50)}...`
-                        : sach.mo_ta || "-"}
-                    </span>
+                  <td style={{ maxWidth: 220 }}>
+                    {sach.mo_ta?.length > 50 ? sach.mo_ta.substring(0, 50) + "..." : sach.mo_ta}
                   </td>
                   <td>
                     <div className="d-flex gap-2">
-                      <Button
-                        variant="warning"
-                        size="sm"
-                        onClick={() => handleEdit(sach)}
-                        className="fw-semibold"
-                        style={{ borderRadius: "8px", minWidth: "80px" }}
-                      >
+                      <Button size="sm" variant="warning" onClick={() => handleEdit(sach)}>
                         Sửa
                       </Button>
-
-                      {/* Nút Ẩn / Khôi phục */}
                       {sach.an_hien === 1 || sach.an_hien === undefined ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleHide(sach.sach_id)}
-                          className="fw-semibold"
-                          style={{ borderRadius: "8px", minWidth: "80px" }}
-                        >
+                        <Button size="sm" variant="secondary" onClick={() => handleHide(sach.sach_id)}>
                           Ẩn
                         </Button>
                       ) : (
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={() => handleRestore(sach.sach_id)}
-                          className="fw-semibold"
-                          style={{ borderRadius: "8px", minWidth: "80px" }}
-                        >
+                        <Button size="sm" variant="success" onClick={() => handleRestore(sach.sach_id)}>
                           Khôi phục
                         </Button>
                       )}
@@ -230,7 +215,34 @@ const AdminProduct = () => {
         </div>
       )}
 
-      {/* Modal thêm/sửa sách */}
+      {/* PAGINATION */}
+      {totalPages > 1 && (
+        <div className="d-flex justify-content-between align-items-center mt-3">
+          <small className="text-muted">
+            Trang {currentPage} / {totalPages}
+          </small>
+          <div className="d-flex gap-2">
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              ← Trước
+            </Button>
+            <Button
+              size="sm"
+              variant="outline-secondary"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              Sau →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal thêm / sửa */}
       <ProductModal
         showModal={showModal}
         setShowModal={setShowModal}

@@ -18,5 +18,6 @@ export interface ISach {
   loai_bia: string;
   image?: string; 
   created_at?: string; 
+  hinh_anh?: string;
   an_hien?: number; 
 }

@@ -24,27 +24,12 @@ export default function VNPayReturnPage() {
         const data = await res.json();
 
         if (data.success) {
-          const don_hang_id = data.don_hang_id;     // ← ID số thật từ backend
-          const orderCode = data.orderCode;         // ← Mã đơn PIBOOK-xxx để hiển thị
-
-          if (!don_hang_id) {
-            console.error('Backend không trả về don_hang_id!');
-            setStatus('failed');
-            setMessage('Lỗi hệ thống: Không lấy được ID đơn hàng.');
-            return;
-          }
-
-          // CẬP NHẬT TỔNG TIỀN – BẮT BUỘC DÙNG ID SỐ!!!
-          await fetch('http://localhost:3003/api/update-order-total', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderId: don_hang_id }),
-          });
+          const orderCode = data.orderCode;
 
           setStatus('success');
           setMessage(`Thanh toán thành công đơn hàng #${orderCode}!`);
 
-          // Xóa giỏ hàng sau khi thanh toán thành công
+          // Xóa giỏ hàng
           localStorage.removeItem('cart');
           localStorage.removeItem('checkoutItems');
           localStorage.removeItem('appliedDiscount');
@@ -84,7 +69,6 @@ export default function VNPayReturnPage() {
       </div>
 
       <div className="relative z-10 max-w-2xl w-full">
-        {/* LOADING */}
         {status === 'loading' && (
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-16 text-center animate-pulse">
             <div className="w-28 h-28 mx-auto mb-8 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full flex items-center justify-center animate-spin">
@@ -97,7 +81,6 @@ export default function VNPayReturnPage() {
           </div>
         )}
 
-        {/* SUCCESS */}
         {status === 'success' && (
           <div className="bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl p-16 text-center transform transition-all duration-1000 scale-100 hover:scale-[1.02]">
             <div className="relative">
@@ -119,33 +102,35 @@ export default function VNPayReturnPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6 justify-center mt-12">
+              {/* Nút Xem đơn hàng - màu cam chủ đạo */}
               <Link
                 href="/orders"
-                className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xl font-bold rounded-2xl overflow-hidden transform hover:scale-105 transition-all duration-300 shadow-xl"
+                className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white text-xl font-bold rounded-2xl overflow-hidden transform hover:scale-105 transition-all duration-300 shadow-xl"
               >
                 <Package className="w-6 h-6 mr-3" />
                 Xem đơn hàng
                 <span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"></span>
               </Link>
 
+              {/* Nút Về trang chủ - cũng màu cam */}
               <Link
                 href="/"
-                className="group inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-gray-700 to-gray-900 text-white text-xl font-bold rounded-2xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white text-xl font-bold rounded-2xl overflow-hidden transform hover:scale-105 transition-all duration-300 shadow-xl"
               >
                 <Home className="w-6 h-6 mr-3" />
                 Về trang chủ
+                <span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"></span>
               </Link>
             </div>
 
             <div className="mt-12 text-center">
               <p className="text-sm text-gray-500">
-                Chúc bạn đọc sách vui vẻ
+                Chúc bạn đọc sách vui vẻ ♡
               </p>
             </div>
           </div>
         )}
 
-        {/* FAILED */}
         {status === 'failed' && (
           <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-16 text-center">
             <div className="w-32 h-32 mx-auto mb-8 bg-red-100 rounded-full flex items-center justify-center">

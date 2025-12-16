@@ -223,51 +223,57 @@ export default function Home() {
 
   // handleBuyNow
   // handleBuyNow – PHIÊN BẢN HOÀN HẢO NHẤT, DÙNG CHUNG VỚI TRANG CHI TIẾT
-const handleBuyNow = (book: Book) => {
-  // 1. Kiểm tra đăng nhập
-  const storedUser = localStorage.getItem("user");
-  if (!storedUser) {
-    showNotification("Vui lòng đăng nhập để mua hàng!", 'warning');
-    router.push("/auth/dangnhap");
-    return;
-  }
-
-  try {
-    const user = JSON.parse(storedUser);
-    if (!user?.id) {
-      showNotification("Phiên đăng nhập không hợp lệ!", 'warning');
-      router.push("/auth/dangnhap");
-      return;
+  const handleBuyNow = (book: Book) => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        showNotification("Vui lòng đăng nhập để mua hàng!", "warning");
+        router.push("/auth/dangnhap");
+        return;
+      }
+  
+      let user;
+      try {
+        user = JSON.parse(storedUser);
+      } catch {
+        showNotification("Phiên đăng nhập không hợp lệ!", "warning");
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        router.push("/auth/dangnhap");
+        return;
+      }
+  
+      // Kiểm tra user có ID hợp lệ không (nguoi_dung_id hoặc id)
+      const userId = user.nguoi_dung_id || user.id;
+      if (!userId) {
+        showNotification("Phiên đăng nhập không hợp lệ!", "warning");
+        localStorage.clear(); // Xóa hết để an toàn
+        router.push("/auth/dangnhap");
+        return;
+      }
+  
+      // === ĐÃ ĐĂNG NHẬP HỢP LỆ → TIẾN HÀNH MUA NGAY ===
+      const selectedItem = {
+        id: book.sach_id,
+        name: book.ten_sach,
+        price: book.gia_sach - (book.gg_sach || 0),
+        image: book.image || "/image/default-book.jpg",
+        quantity: 1,
+        stock: book.ton_kho_sach,
+      };
+  
+      localStorage.setItem("checkoutItems", JSON.stringify([selectedItem]));
+      localStorage.removeItem("checkoutItem");
+      localStorage.removeItem("cartItem");
+  
+      router.push("/checkout");
+  
+      showNotification(`Đã chọn "${book.ten_sach}" để mua ngay!`, "success");
+    } catch (error) {
+      console.error("Lỗi mua ngay:", error);
+      showNotification("Có lỗi xảy ra, vui lòng thử lại!", "danger");
     }
-
-    // 2. Tạo item mua ngay – giống hệt trang chi tiết
-    const selectedItem = {
-      id: book.sach_id,
-      name: book.ten_sach,
-      price: book.gia_sach - (book.gg_sach || 0),
-      image: book.image || "/image/default-book.jpg",
-      quantity: 1,
-      stock: book.ton_kho_sach, // thêm stock để checkout kiểm tra
-    };
-
-    // 3. LƯU DƯỚI DẠNG MẢNG – DÙNG CHUNG VỚI GIỎ HÀNG
-    localStorage.setItem("checkoutItems", JSON.stringify([selectedItem]));
-
-    // 4. XÓA KEY CŨ ĐỂ TRÁNH NHẦM LẪN
-    localStorage.removeItem("checkoutItem");
-    localStorage.removeItem("cartItem");
-
-    // 5. CHUYỂN HƯỚNG MƯỢT MÀ
-    router.push("/checkout");
-
-    // 6. THÔNG BÁO THÀNH CÔNG
-    showNotification(`Đã chọn "${book.ten_sach}" để mua ngay!`, 'success');
-
-  } catch (error) {
-    console.error("Lỗi mua ngay:", error);
-    showNotification("Có lỗi xảy ra, vui lòng thử lại!", 'danger');
-  }
-};
+  };
   
 
   // Helper: format discount for UI - format số nguyên không có .00
@@ -359,7 +365,7 @@ const handleBuyNow = (book: Book) => {
     background: "#ffd79e",
     borderRadius: "32px",
     marginTop: "32px",
-    boxShadow: "0 12px 45px rgba(38,166,154,0.15)" 
+    boxShadow: "0 12px 45px rgba(38,166,154,0.15)", 
   }}
 >
   <Row className="align-items-center position-relative overflow-hidden">
@@ -446,7 +452,7 @@ const handleBuyNow = (book: Book) => {
         <Col xs={12} md={3} className="d-flex flex-column gap-3">
     {[
       { img: "abc.jpg", link: "https://nigioikhatsi.net/kinhsach-pdf/Duong%20Xua%20May%20Trang.pdf" },
-      { img: "114.jpg", link: "https://vnexpress.net/giai-tri/sach/diem-sach" },
+      { img: "kheo-an-noi-mck5-996.jpg", link: "https://khoahoctamlinh.vn/img/news/2021/12/larger/5428-kheo-an-noi-se-co-duoc-thien-ha-pdf-khoahoctamlinh.vn.pdf" },
     ].map((item, i) => (
       <a
         key={i}
@@ -501,9 +507,9 @@ const handleBuyNow = (book: Book) => {
               >
                 <div className="carousel-inner h-100">
                   {[
-                    "b9690ac7ec4b7c94d44d9e519b6c30e7.jpg",
-                    "08cca0755fa6c45fda26187053cf1f4d.jpg",
-                    "0f342e41bb8009c013ee9435f249b3d7.jpg",
+                    "/505265f810ea9d0e915b82e4ca81703c.jpg",
+                    "6479a245a42d8a122c246267c94303d2.jpg",
+                    "02ff0be04f0d87a747e29fe2870af8b2.jpg",
                   ].map((img, i) => (
                     <div
                       key={i}

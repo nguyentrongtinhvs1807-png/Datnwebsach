@@ -180,7 +180,7 @@ export default function Contact() {
                   <div>
                     <div>Hoặc liên hệ trực tiếp:</div>
                     <div>Pibook - Nhà sách trực tuyến</div>
-                    <div className="text-secondary" style={{fontSize: "0.97rem"}}>Email: support@pibook.vn</div>
+                    <div className="text-secondary" style={{fontSize: "0.97rem"}}>Email:nguyentrongtinhvs1807@gmail.com</div>
                     <div className="text-secondary" style={{fontSize: "0.97rem"}}>Địa chỉ: 123 Đường Sách, P. Văn Hóa, TP. Tri Thức</div>
                   </div>
                 </div>

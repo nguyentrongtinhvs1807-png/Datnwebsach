@@ -31,25 +31,25 @@ export default function AdminLoaiSachPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<LoaiSach | null>(null);
   const [form, setForm] = useState<LoaiSach>({ ten_loai: "" });
+
   const [showBooksModal, setShowBooksModal] = useState(false);
   const [selectedLoai, setSelectedLoai] = useState<LoaiSach | null>(null);
   const [books, setBooks] = useState<Sach[]>([]);
+
   const [search, setSearch] = useState("");
   const [sortAsc, setSortAsc] = useState(true);
 
-  // State cho modal lỗi khi xóa không được
-  const [deleteError, setDeleteError] = useState<string>("");
+  const [deleteError, setDeleteError] = useState("");
 
   const API_URL = "http://localhost:3003";
 
   const fetchLoaiSach = async () => {
     try {
       const res = await fetch(`${API_URL}/loaisach`);
-      if (!res.ok) throw new Error("Không thể tải danh sách loại sách");
       const data = await res.json();
       setLoaiSach(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Lỗi khi tải loại sách:", err);
+      console.error(err);
     }
   };
 
@@ -60,7 +60,7 @@ export default function AdminLoaiSachPage() {
   const handleShow = (item?: LoaiSach) => {
     if (item) {
       setEditing(item);
-      setForm(item);
+      setForm({ ten_loai: item.ten_loai });
     } else {
       setEditing(null);
       setForm({ ten_loai: "" });
@@ -86,27 +86,23 @@ export default function AdminLoaiSachPage() {
         body: JSON.stringify(form),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Không thể lưu loại sách");
-      }
+      if (!res.ok) throw new Error();
 
       alert(editing ? "Cập nhật thành công!" : "Thêm mới thành công!");
       setShowModal(false);
       fetchLoaiSach();
-    } catch (err: any) {
-      alert("Lỗi: " + err.message);
+    } catch {
+      alert("Lỗi khi lưu loại sách");
     }
   };
 
-  // HÀM XÓA 
   const handleDelete = async (id?: number) => {
     if (!id) return;
 
     const loai = loaisach.find((l) => l.loai_sach_id === id);
     if (!loai) return;
 
-    if (!confirm(`Bạn có chắc muốn xóa loại sách "${loai.ten_loai} không?`)) return;
+    if (!confirm(`Bạn có chắc muốn xóa "${loai.ten_loai}"?`)) return;
 
     try {
       const res = await fetch(`${API_URL}/loaisach/${id}`, {
@@ -114,19 +110,15 @@ export default function AdminLoaiSachPage() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        const msg = errorData.error || "Không thể xóa loại sách do có sách đang sử dụng.";
-
-        // Hiển thị thông báo đẹp khi bị chặn
-        setDeleteError(msg);
+        const err = await res.json().catch(() => ({}));
+        setDeleteError(err.error || "Không thể xóa do có sách đang sử dụng");
         setSelectedLoai(loai);
         return;
       }
 
-      alert("Xóa thành công!");
       fetchLoaiSach();
-    } catch (err: any) {
-      setDeleteError("Có lỗi xảy ra khi xóa loại sách. Vui lòng thử lại!");
+    } catch {
+      setDeleteError("Có lỗi xảy ra khi xóa");
       setSelectedLoai(loai);
     }
   };
@@ -136,21 +128,16 @@ export default function AdminLoaiSachPage() {
     setShowBooksModal(true);
     try {
       const res = await fetch(`${API_URL}/loaisach/${loai.loai_sach_id}/sach`);
-      if (!res.ok) throw new Error("Không thể tải danh sách sách");
       const data = await res.json();
       setBooks(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Lỗi khi tải sách:", err);
+    } catch {
       setBooks([]);
     }
   };
 
-  const formatPrice = (price: number) =>
-    price?.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + " ₫";
-
   const filteredLoaiSach = loaisach
     .filter((ls) =>
-      ls.ten_loai.toLowerCase().includes(search.trim().toLowerCase())
+      ls.ten_loai.toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) =>
       sortAsc
@@ -158,295 +145,128 @@ export default function AdminLoaiSachPage() {
         : b.ten_loai.localeCompare(a.ten_loai)
     );
 
+  const formatPrice = (p: number) =>
+    p.toLocaleString("vi-VN") + " ₫";
+
   return (
     <>
-      {/* MODAL CẢNH BÁO KHI KHÔNG XÓA ĐƯỢC */}
-      <Modal show={!!deleteError} onHide={() => setDeleteError("")} centered backdrop="static">
+      {/* MODAL LỖI XÓA */}
+      <Modal show={!!deleteError} onHide={() => setDeleteError("")} centered>
         <Modal.Header closeButton className="bg-danger text-white">
-          <Modal.Title className="d-flex align-items-center gap-2">
-            <i className="bi bi-exclamation-triangle-fill"></i>
-            Không thể xóa loại sách
-          </Modal.Title>
+          <Modal.Title>Không thể xóa</Modal.Title>
         </Modal.Header>
-        <Modal.Body className="text-center py-5">
-          <i className="bi bi-bookshelf text-danger" style={{ fontSize: "4.5rem" }}></i>
-          <h4 className="mt-4 fw-bold text-dark">{selectedLoai?.ten_loai}</h4>
-          <p className="lead text-muted mt-3 px-4">{deleteError}</p>
-          <small className="text-muted d-block mt-4">
-            Gợi ý: Vào <strong>Quản lý sản phẩm</strong> → lọc theo loại này → chuyển hoặc xóa sách trước nhé!
-          </small>
+        <Modal.Body className="text-center">
+          <h5>{selectedLoai?.ten_loai}</h5>
+          <p className="text-muted">{deleteError}</p>
         </Modal.Body>
-        <Modal.Footer className="justify-content-center">
-          <Button variant="secondary" size="lg" onClick={() => setDeleteError("")}>
-            Đã hiểu, cảm ơn!
-          </Button>
+        <Modal.Footer>
+          <Button onClick={() => setDeleteError("")}>Đã hiểu</Button>
         </Modal.Footer>
       </Modal>
 
-      {/* GIAO DIỆN CHÍNH */}
-      <div className="container-fluid px-lg-5 px-2 mt-4">
-        <div
-          className="rounded shadow-sm px-4 py-4 mb-4"
-          style={{
-            background: "linear-gradient(90deg, #eaf1fb 0%, #f6f8ff 100%)",
-            border: "2px solid #88b6f7",
-            maxWidth: 1000,
-            margin: "0 auto",
-          }}
-        >
-          <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3 gap-3">
-            <h2 className="fw-bold mb-0" style={{ color: "#2154C5" }}>
-              Quản lý Danh Mục Loại Sách
-            </h2>
-            <div className="d-flex flex-wrap align-items-center gap-2 mt-3 mt-md-0">
-              <InputGroup style={{ minWidth: 250, maxWidth: 300 }}>
-                <Form.Control
-                  type="text"
-                  placeholder="Tìm kiếm theo tên loại sách..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  style={{
-                    background: "#fff",
-                    border: "2px solid #c3e0fc",
-                    borderRadius: "8px 0 0 8px",
-                    fontWeight: 500,
-                    fontSize: "1rem",
-                  }}
-                />
-                <Button variant="outline-secondary" style={{ borderWidth: "2px" }}>
-                  Search
-                </Button>
-              </InputGroup>
-              <Button
-                variant="primary"
-                className="fw-semibold px-3 py-2"
-                style={{ borderRadius: "8px" }}
-                onClick={() => handleShow()}
-              >
-                Thêm loại sách
-              </Button>
-            </div>
-          </div>
-
-          <div className="table-responsive shadow-sm rounded-3 overflow-hidden my-2">
-            <Table hover borderless className="align-middle mb-0">
-              <thead
-                style={{
-                  background: "linear-gradient(90deg, #4369e3 0%, #62bbff 100%)",
-                  color: "white",
-                }}
-                className="text-center"
-              >
-                <tr>
-                  <th style={{ width: "80px", fontWeight: 600 }}>ID</th>
-                  <th
-                    className="pointer"
-                    style={{ cursor: "pointer", fontWeight: 600 }}
-                    onClick={() => setSortAsc((v) => !v)}
-                  >
-                    Tên loại sách{" "}
-                    <i className={`bi bi-sort-alpha-${sortAsc ? "down" : "up"}-alt ms-1`}></i>
-                  </th>
-                  <th style={{ width: "380px", fontWeight: 600 }}>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLoaiSach.length > 0 ? (
-                  filteredLoaiSach.map((ls, idx) => (
-                    <tr
-                      key={ls.loai_sach_id}
-                      style={{
-                        background: idx % 2 === 0 ? "#f4f9fd" : "#fafdff",
-                        borderBottom: "1px solid #eaf1fb",
-                      }}
-                    >
-                      <td className="text-center fw-semibold" style={{ color: "#4266e3" }}>
-                        {ls.loai_sach_id}
-                      </td>
-                      <td className="fw-bold" style={{ fontSize: "1.08rem" }}>
-                        {ls.ten_loai}
-                      </td>
-
-                      <td className="text-center py-4">
-                        <div className="d-flex justify-content-center align-items-center gap-4">
-                          <button
-                            onClick={() => handleViewBooks(ls)}
-                            className="btn btn-outline-info d-flex align-items-center gap-2 fw-bold shadow-sm border-2"
-                            style={{
-                              borderRadius: "16px",
-                              padding: "10px 20px",
-                              minWidth: "130px",
-                              fontSize: "1rem",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = "#d1ecf1";
-                              e.currentTarget.style.transform = "translateY(-3px)";
-                              e.currentTarget.style.boxShadow = "0 8px 20px rgba(13,110,199,0.25)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "";
-                              e.currentTarget.style.transform = "";
-                              e.currentTarget.style.boxShadow = "";
-                            }}
-                          >
-                            Xem sách
-                          </button>
-
-                          <button
-                            onClick={() => handleShow(ls)}
-                            className="btn btn-outline-warning d-flex align-items-center gap-2 fw-bold shadow-sm border-2"
-                            style={{
-                              borderRadius: "16px",
-                              padding: "10px 20px",
-                              minWidth: "110px",
-                              fontSize: "1rem",
-                              transition: "all 0.3s ease",
-                              color: "#a06b00",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = "#fff3cd";
-                              e.currentTarget.style.transform = "translateY(-3px)";
-                              e.currentTarget.style.boxShadow = "0 8px 20px rgba(255,193,7,0.3)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "";
-                              e.currentTarget.style.transform = "";
-                              e.currentTarget.style.boxShadow = "";
-                            }}
-                          >
-                            Sửa
-                          </button>
-
-                          <button
-                            onClick={() => handleDelete(ls.loai_sach_id)}
-                            className="btn btn-outline-danger d-flex align-items-center gap-2 fw-bold shadow-sm border-2"
-                            style={{
-                              borderRadius: "16px",
-                              padding: "10px 20px",
-                              minWidth: "110px",
-                              fontSize: "1rem",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = "#f8d7da";
-                              e.currentTarget.style.transform = "translateY(-3px)";
-                              e.currentTarget.style.boxShadow = "0 8px 20px rgba(220,53,69,0.3)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "";
-                              e.currentTarget.style.transform = "";
-                              e.currentTarget.style.boxShadow = "";
-                            }}
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="text-center text-muted py-5 fs-4">
-                      Chưa có loại sách nào
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </Table>
-          </div>
+      <div className="container-fluid px-4 mt-4">
+        <div className="d-flex justify-content-between mb-3">
+          <h2 className="fw-bold text-primary">Quản lý loại sách</h2>
+          <Button onClick={() => handleShow()}>Thêm loại sách</Button>
         </div>
 
-        {/* Modal thêm/sửa loại sách
-        <Modal show={showModal} onHide={() => setShowModal(false)} centered backdrop="static">
-          <Modal.Header closeButton style={{ background: "#f4f7fc", borderBottom: "1px solid #dadce6" }}>
-            <Modal.Title className="fw-bold" style={{ color: "#21409A" }}>
-              {editing ? "Sửa loại sách" : "Thêm loại sách"}
-            </Modal.Title>
+        <InputGroup className="mb-3" style={{ maxWidth: 300 }}>
+          <Form.Control
+            placeholder="Tìm kiếm..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </InputGroup>
+
+        <Table hover bordered>
+          <thead className="text-center">
+            <tr>
+              <th>ID</th>
+              <th
+                style={{ cursor: "pointer" }}
+                onClick={() => setSortAsc(!sortAsc)}
+              >
+                Tên loại
+              </th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLoaiSach.map((ls) => (
+              <tr key={ls.loai_sach_id}>
+                <td className="text-center">{ls.loai_sach_id}</td>
+                <td>{ls.ten_loai}</td>
+                <td className="text-center">
+                  <Button size="sm" onClick={() => handleViewBooks(ls)}>
+                    Xem sách
+                  </Button>{" "}
+                  <Button size="sm" variant="warning" onClick={() => handleShow(ls)}>
+                    Sửa
+                  </Button>{" "}
+                  <Button size="sm" variant="danger" onClick={() => handleDelete(ls.loai_sach_id)}>
+                    Xóa
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+
+        {/* MODAL THÊM / SỬA */}
+        <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>{editing ? "Sửa loại sách" : "Thêm loại sách"}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <Form>
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold" style={{ color: "#2154C5" }}>
-                  Tên loại sách <span className="text-danger">*</span>
-                </Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Nhập tên loại sách..."
-                  value={form.ten_loai}
-                  onChange={(e) => setForm({ ...form, ten_loai: e.target.value })}
-                  style={{
-                    borderRadius: "10px",
-                    border: "2px solid #e0e0e0",
-                    padding: "12px",
-                    fontSize: "1.1rem",
-                  }}
-                  autoFocus
-                />
-              </Form.Group>
-            </Form>
+            <Form.Control
+              placeholder="Tên loại sách"
+              value={form.ten_loai}
+              onChange={(e) => setForm({ ten_loai: e.target.value })}
+            />
           </Modal.Body>
-          <Modal.Footer style={{ background: "#f4f7fc", borderTop: "1px solid #dadce6" }}>
-            <Button variant="secondary" className="px-4 fw-semibold" style={{ borderRadius: "8px" }} onClick={() => setShowModal(false)}>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
               Hủy
             </Button>
-            <Button variant="primary" className="px-4 fw-semibold" style={{ borderRadius: "8px" }} onClick={handleSave}>
-              Lưu
-            </Button>
+            <Button onClick={handleSave}>Lưu</Button>
           </Modal.Footer>
         </Modal>
 
-        {/* Modal xem sách thuộc loại */}
+        {/* MODAL XEM SÁCH */}
         <Modal show={showBooksModal} onHide={() => setShowBooksModal(false)} size="lg" centered>
-          <Modal.Header closeButton style={{ background: "#f4f7fc", borderBottom: "1px solid #dadce6" }}>
-            <Modal.Title className="fw-bold" style={{ color: "#2154C5" }}>
-              Danh sách sách thuộc loại: <span className="text-primary">{selectedLoai?.ten_loai}</span>
+          <Modal.Header closeButton>
+            <Modal.Title>
+              Sách thuộc loại: {selectedLoai?.ten_loai}
             </Modal.Title>
           </Modal.Header>
-          <Modal.Body style={{ background: "#fafbfe" }}>
+          <Modal.Body>
             {books.length > 0 ? (
-              <div className="table-responsive">
-                <Table hover bordered className="align-middle">
-                  <thead className="text-center" style={{ background: "#eaf1fb" }}>
-                    <tr>
-                      <th>ID</th>
-                      <th>Ảnh</th>
-                      <th>Tên sách</th>
-                      <th>Tác giả</th>
-                      <th>NXB</th>
-                      <th>Giá</th>
+              <Table bordered>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Ảnh</th>
+                    <th>Tên</th>
+                    <th>Giá</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {books.map((b) => (
+                    <tr key={b.sach_id}>
+                      <td>{b.sach_id}</td>
+                      <td>
+                        <Image src={b.hinh_sach} width={50} />
+                      </td>
+                      <td>{b.ten_sach}</td>
+                      <td className="text-danger fw-bold">
+                        {formatPrice(b.gia_sach)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {books.map((b, idx) => (
-                      <tr key={b.sach_id} style={{ background: idx % 2 ? "#fafdff" : "#f4f8fd" }}>
-                        <td className="text-center fw-semibold">{b.sach_id}</td>
-                        <td className="text-center">
-                          <Image
-                            src={b.hinh_sach || "/image/default-book.jpg"}
-                            alt={b.ten_sach}
-                            width={55}
-                            height={70}
-                            rounded
-                            style={{ objectFit: "cover", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
-                          />
-                        </td>
-                        <td>
-                          <div className="fw-bold text-primary">{b.ten_sach}</div>
-                          <small className="text-muted">{b.mo_ta?.substring(0, 50)}...</small>
-                        </td>
-                        <td>{b.ten_tac_gia}</td>
-                        <td>{b.ten_NXB}</td>
-                        <td className="fw-bold text-danger">{formatPrice(b.gia_sach)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
+                  ))}
+                </tbody>
+              </Table>
             ) : (
-              <p className="text-center text-muted py-5 fs-4">
-                Không có sách nào trong loại này
-              </p>
+              <p className="text-center text-muted">Không có sách</p>
             )}
           </Modal.Body>
         </Modal>

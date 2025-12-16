@@ -36,7 +36,7 @@ export default function DoiPass() {
 
   // ✅ Xử lý đổi mật khẩu
   async function handleDoiPass(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+    e.preventDefault(); // tránh trình duyện reloaad trang
     setMessage("");
 
     if (!passOld || !passNew1 || !passNew2)

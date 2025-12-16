@@ -26,8 +26,8 @@ type Discount = {
 
 const FREE_SHIPPING_THRESHOLD = 500000;
 const SHIPPING_OPTIONS = [
-  { label: "Nội thành TP.HCM/Hà Nội", fee: 30000 },
-  { label: "Các tỉnh thành khác", fee: 50000 },
+  { label: "Nội thành TP.HCM/Và Các Khu Vực lân cận", fee: 30000 },
+  { label: "Các tỉnh thành khác/Ngoại Thành", fee: 50000 },
 ];
 
 export default function CheckoutPage() {
@@ -50,15 +50,13 @@ export default function CheckoutPage() {
   const [discountMessage, setDiscountMessage] = useState("");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [shippingFee, setShippingFee] = useState<number>(30000);
-
-  // Thêm state để hiện lỗi
   const [phoneError, setPhoneError] = useState("");
 
   const formatPrice = (price: number) => price.toLocaleString("vi-VN") + "đ";
 
-  // Hàm validate số điện thoại
+  // Validate số điện thoại
   const validatePhone = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, ""); // chỉ giữ số
+    const cleaned = phone.replace(/\D/g, "");
     if (cleaned.length === 0) {
       setPhoneError("Vui lòng nhập số điện thoại");
       return false;
@@ -75,7 +73,7 @@ export default function CheckoutPage() {
     return true;
   };
 
-  // Hàm dọn dẹp giỏ hàng sau khi đặt thành công
+  // Dọn giỏ hàng sau khi đặt thành công
   const clearCartAfterCheckout = () => {
     try {
       const checkoutItemsJson = localStorage.getItem("checkoutItems");
@@ -85,12 +83,7 @@ export default function CheckoutPage() {
       const checkoutIds = checkoutItems.map(item => String(item.id));
 
       const currentCartJson = localStorage.getItem("cart");
-      let currentCart: any[] = [];
-      if (currentCartJson) {
-        try {
-          currentCart = JSON.parse(currentCartJson);
-        } catch {}
-      }
+      let currentCart: any[] = currentCartJson ? JSON.parse(currentCartJson) : [];
 
       const updatedCart = currentCart.filter(
         (item: any) => !checkoutIds.includes(String(item.id || item.sach_id))
@@ -116,26 +109,26 @@ export default function CheckoutPage() {
       .join(" ");
   };
 
+  // === TỰ ĐỘNG ĐIỀN THÔNG TIN KHI ĐÃ ĐĂNG NHẬP ===
   useEffect(() => {
     const rawUser = localStorage.getItem("user");
     if (rawUser) {
       try {
         const user = JSON.parse(rawUser);
-        const userEmail = user.email || "";
-        const fullName = user.ho_ten || user.name || generateNameFromEmail(userEmail);
 
         setCustomer(prev => ({
           ...prev,
-          name: fullName,
-          email: userEmail,
-          phone: user.phone || user.sdt || "",
-          address: user.address || "",
+          name: user.ho_ten || generateNameFromEmail(user.email || ""),
+          email: user.email || prev.email,
+          phone: user.so_dien_thoai || "",         // ← Ưu tiên lấy số điện thoại từ DB
+          address: user.dia_chi || prev.address,  // ← Tự động điền địa chỉ nếu có
         }));
       } catch (e) {
         console.error("Parse user lỗi:", e);
       }
     }
 
+    // Load giỏ hàng từ checkoutItems
     const itemsJson = localStorage.getItem("checkoutItems");
     if (itemsJson && itemsJson !== "null") {
       try {
@@ -155,6 +148,7 @@ export default function CheckoutPage() {
       }
     }
 
+    // Load mã giảm giá đã lưu
     const savedFromCart = localStorage.getItem("appliedDiscount");
     if (savedFromCart) {
       try {
@@ -253,26 +247,26 @@ export default function CheckoutPage() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error("Giỏ hàng trống!");
-
-    // Kiểm tra các trường bắt buộc
     if (!customer.name.trim()) return toast.error("Vui lòng nhập họ và tên!");
     if (!customer.address.trim()) return toast.error("Vui lòng nhập địa chỉ giao hàng!");
-
-    // Kiểm tra số điện thoại
-    if (!validatePhone(customer.phone)) {
-      return toast.error("Số điện thoại không hợp lệ!");
-    }
+    if (!validatePhone(customer.phone)) return toast.error("Số điện thoại không hợp lệ!");
 
     setIsCheckingOut(true);
 
     try {
-      // === VNPAY ===
+      // Xử lý VNPAY (giữ nguyên)
       if (customer.payment === "vnpay") {
         const orderResponse = await fetch("http://localhost:3003/api/don-hang", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            customer: { name: customer.name, phone: customer.phone, address: customer.address, email: customer.email, note: customer.note || "" },
+            customer: {
+              name: customer.name,
+              phone: customer.phone,
+              address: customer.address,
+              email: customer.email,
+              note: customer.note || "",
+            },
             items: cart,
             total: finalPrice,
             paymentMethod: "vnpay",
@@ -302,9 +296,11 @@ export default function CheckoutPage() {
         }
       }
 
-      // === COD / CHUYỂN KHOẢN ===
+      // COD hoặc chuyển khoản
       const userRaw = localStorage.getItem("user");
-      const userId = userRaw ? JSON.parse(userRaw)?.nguoi_dung_id || JSON.parse(userRaw)?.id || null : null;
+      const userId = userRaw
+        ? JSON.parse(userRaw)?.nguoi_dung_id || JSON.parse(userRaw)?.id || null
+        : null;
 
       const orderData = {
         ho_ten: customer.name,
@@ -329,7 +325,6 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error("Lỗi tạo đơn hàng");
 
       clearCartAfterCheckout();
-
       toast.success("Đặt hàng thành công! Cảm ơn bạn đã mua sắm tại PIBOOK");
 
       setTimeout(() => {
@@ -385,7 +380,6 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                {/* SỐ ĐIỆN THOẠI + LỖI */}
                 <div className="col-12 col-md-6">
                   <label className="form-label fw-medium">
                     Số điện thoại <span className="text-danger">*</span>
@@ -393,12 +387,12 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     className={`form-control form-control-lg ${phoneError ? "is-invalid" : ""}`}
-                    placeholder="0901234567"
+                    placeholder="0123456789"
                     value={customer.phone}
                     onChange={e => {
-                      const value = e.target.value.replace(/\D/g, "").slice(0, 10); // chỉ cho nhập số, tối đa 10
+                      const value = e.target.value.replace(/\D/g, "").slice(0, 10);
                       setCustomer({ ...customer, phone: value });
-                      validatePhone(value); // validate realtime
+                      validatePhone(value);
                     }}
                     maxLength={10}
                   />
@@ -437,7 +431,7 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                {/* PHÍ SHIP */}
+                {/* Khu vực giao hàng & phí ship */}
                 <div className="col-12 mt-4">
                   <label className="form-label fw-bold text-primary">Khu vực giao hàng</label>
                   <div className="row g-3">
@@ -474,6 +468,7 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
+                {/* Phương thức thanh toán */}
                 <div className="col-12 mt-3">
                   <label className="form-label fw-bold text-primary">Phương thức thanh toán</label>
                   <select
@@ -526,7 +521,7 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* MÃ GIẢM GIÁ */}
+              {/* Mã giảm giá */}
               <div className="bg-light rounded-3 p-3 mb-3">
                 <div className="d-flex gap-2 mb-2">
                   <input
@@ -572,7 +567,7 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* TỔNG TIỀN */}
+              {/* Tổng tiền */}
               <div className="pt-2 border-top">
                 <div className="d-flex justify-content-between mb-2">
                   <span>Tạm tính</span>

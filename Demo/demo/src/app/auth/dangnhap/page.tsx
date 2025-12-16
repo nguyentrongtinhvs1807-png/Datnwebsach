@@ -46,21 +46,32 @@ export default function LoginForm() {
         return;
       }
 
-      // Lưu vào localStorage
+      // === LƯU THÔNG TIN ĐĂNG NHẬP ===
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.user.role);
 
+      // === XÓA GIỎ HÀNG CŨ KHI ĐĂNG NHẬP (QUAN TRỌNG NHẤT!) ===
+      localStorage.removeItem("cart");              // Xóa toàn bộ sản phẩm trong giỏ
+      localStorage.removeItem("appliedDiscount");   // Xóa mã giảm giá cũ
+      localStorage.removeItem("checkoutItems");     // Xóa items đã chọn thanh toán
+
+      // Phát sự kiện để các component khác biết đã login và giỏ hàng thay đổi
       window.dispatchEvent(new Event("login"));
+      window.dispatchEvent(new Event("cart-update"));
 
       // Điều hướng theo role
-      if (data.user.role === "admin") router.push("/admin");
-      else router.push("/home");
+      if (data.user.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/home");
+      }
 
+      // Thông báo thành công
       if (thongbaoRef.current)
         thongbaoRef.current.innerHTML = `
           <div class="alert alert-success py-2 text-center">
-            Đăng nhập thành công!
+            Đăng nhập thành công! Đang chuyển hướng...
           </div>`;
     } catch (error) {
       if (thongbaoRef.current)

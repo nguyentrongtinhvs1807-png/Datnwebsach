@@ -13,7 +13,7 @@ export default function Sidebar({ activeTab, setActiveTab, handleLogout }: Sideb
   const router = useRouter();
 
   const menuItems = [
-    { key: "dashboard", label: "Trang chủ", icon: "fas fa-home" },
+    { key: "dashboard", label: "Tổng Quan", icon: "fas fa-home" },
     { key: "products", label: "Quản lý sản phẩm", icon: "fas fa-book-open" },
     { key: "comments", label: "Quản lý bình luận", icon: "fas fa-comments" },
     { key: "users", label: "Người dùng", icon: "fas fa-users" },

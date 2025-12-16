@@ -1,16 +1,16 @@
-// app/cart/page.tsx - GIÁ KHUYẾN MÃI HIỆN ĐÚNG + KHÔNG CÒN LỖI onClickizing
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { FaMinus, FaPlus, FaTrashAlt } from "react-icons/fa";
+import { useRouter } from "next/navigation";
 
 type Product = {
   id: string;
   name: string;
-  price: number;           
-  originalPrice?: number;  
+  price: number;
+  originalPrice?: number;
   image: string;
   quantity: number;
   stock: number;
@@ -32,6 +32,7 @@ export default function CartPage() {
   const [appliedDiscount, setAppliedDiscount] = useState<Discount | null>(null);
   const [discountMessage, setDiscountMessage] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const router = useRouter();
 
   const selectedProducts = cart.filter((item) => selectedIds.includes(item.id));
   const totalSelected = selectedProducts.reduce(
@@ -40,12 +41,11 @@ export default function CartPage() {
   );
 
   const formatPrice = (price: number) =>
-    Number(price).toLocaleString("vi-VN") + "đ";
+    Number(price).toLocaleString("vi-VN") + " ₫";
 
   useEffect(() => {
     const loadCart = async () => {
       setMounted(true);
-
       let stored: any[] = [];
       try {
         const raw = localStorage.getItem("cart");
@@ -53,15 +53,11 @@ export default function CartPage() {
       } catch {
         stored = [];
       }
-
       const normalized: Product[] = [];
-
       for (const item of stored) {
         if (!item || (!item.id && !item.sach_id)) continue;
-
         let bookData: any = {};
         let realStock = Number(item.stock || item.ton_kho_sach) || 0;
-
         try {
           const res = await fetch(`http://localhost:3003/books/${item.id || item.sach_id}`);
           if (res.ok) {
@@ -71,12 +67,9 @@ export default function CartPage() {
         } catch (err) {
           console.warn("Lỗi lấy tồn kho sách ID:", item.id || item.sach_id);
         }
-
-        // ƯU TIÊN GIÁ KHUYẾN MÃI NẾU CÓ
         const discountedPrice = bookData.gia_khuyen_mai || bookData.discounted_price;
         const finalPrice = discountedPrice || Number(item.price || item.gia_ban || item.gia_sach || 0);
         const originalPrice = discountedPrice ? Number(item.price || item.gia_ban || item.gia_sach) : undefined;
-
         normalized.push({
           id: String(item.id || item.sach_id),
           name: item.name || item.ten_sach || bookData.ten_sach || "Sản phẩm",
@@ -87,10 +80,8 @@ export default function CartPage() {
           stock: realStock,
         });
       }
-
       setCart(normalized);
       setSelectedIds(normalized.map((i) => i.id));
-
       const saved = localStorage.getItem("appliedDiscount");
       if (saved) {
         try {
@@ -102,18 +93,15 @@ export default function CartPage() {
         }
       }
     };
-
     loadCart();
   }, []);
 
   const discountAmount = useMemo(() => {
     if (!appliedDiscount) return 0;
     if (appliedDiscount.minOrderValue && totalSelected < appliedDiscount.minOrderValue) return 0;
-
     let amount = appliedDiscount.type === "percent"
       ? Math.floor(totalSelected * appliedDiscount.value / 100)
       : appliedDiscount.value;
-
     if (appliedDiscount.maxDiscount) amount = Math.min(amount, appliedDiscount.maxDiscount);
     return amount;
   }, [appliedDiscount, totalSelected]);
@@ -124,12 +112,10 @@ export default function CartPage() {
     const code = discountCode.trim().toUpperCase();
     if (!code) return setDiscountMessage("Vui lòng nhập mã giảm giá!");
     if (appliedDiscount) return setDiscountMessage("Bạn chỉ được dùng 1 mã giảm giá!");
-
     setIsApplying(true);
     try {
       const res = await fetch(`http://localhost:3003/discount-codes/${code}`);
       if (!res.ok) throw new Error((await res.json()).error || "Mã không hợp lệ");
-
       const voucher = await res.json();
       const discount: Discount = {
         code: voucher.code,
@@ -138,12 +124,10 @@ export default function CartPage() {
         maxDiscount: voucher.maxDiscount || undefined,
         minOrderValue: voucher.minOrder || undefined,
       };
-
       if (discount.minOrderValue && totalSelected < discount.minOrderValue) {
         setDiscountMessage(`Mã cần đơn từ ${formatPrice(discount.minOrderValue)}`);
         return;
       }
-
       setAppliedDiscount(discount);
       localStorage.setItem("appliedDiscount", JSON.stringify(discount));
       setDiscountCode("");
@@ -195,16 +179,27 @@ export default function CartPage() {
       alert("Vui lòng chọn ít nhất 1 sản phẩm để thanh toán!");
       return;
     }
-
+    const storedUser = localStorage.getItem("user");
+    if (!storedUser) {
+      sessionStorage.setItem("redirectAfterLogin", window.location.pathname);
+      router.push("/auth/dangnhap");
+      return;
+    }
     localStorage.setItem("checkoutItems", JSON.stringify(selectedProducts));
     if (appliedDiscount) {
       localStorage.setItem("appliedDiscount", JSON.stringify(appliedDiscount));
     } else {
       localStorage.removeItem("appliedDiscount");
     }
-
-    window.location.href = "/checkout?t=" + Date.now();
+    router.push("/checkout?t=" + Date.now());
   };
+
+  useEffect(() => {
+    const redirectPath = sessionStorage.getItem("redirectAfterLogin");
+    if (redirectPath === "/cart" && localStorage.getItem("user")) {
+      sessionStorage.removeItem("redirectAfterLogin");
+    }
+  }, []);
 
   if (!mounted) return <div className="text-center py-5 fs-4">Đang tải giỏ hàng...</div>;
 
@@ -258,7 +253,6 @@ export default function CartPage() {
                       const isSelected = selectedIds.includes(item.id);
                       const stockColor =
                         item.stock === 0 ? "text-danger" : item.stock <= 5 ? "text-warning" : "text-success";
-
                       return (
                         <tr key={item.id} style={{ background: isSelected ? "#fffde7" : "" }}>
                           <td>
@@ -343,6 +337,7 @@ export default function CartPage() {
                 <h5 className="fw-bold text-primary mb-3">Tóm tắt đơn hàng</h5>
                 <hr />
 
+                {/* Mã giảm giá */}
                 {!appliedDiscount ? (
                   <div className="mb-4">
                     <div className="d-flex gap-2 mb-2">
@@ -364,7 +359,7 @@ export default function CartPage() {
                       </button>
                     </div>
                     {discountMessage && (
-                      <div className={`small mt-2 fw-medium ${discountMessage.includes("thành công") ? "text-success" : "text-danger"}`}>
+                      <div className={`small mt-2 fw-medium ${discountMessage.includes("thành công") || discountMessage.includes("0 ₫") ? "text-success" : "text-danger"}`}>
                         {discountMessage}
                       </div>
                     )}
@@ -383,19 +378,21 @@ export default function CartPage() {
                   </div>
                 )}
 
+                {/* Tạm tính */}
                 <div className="d-flex justify-content-between mb-2">
                   <span>Tạm tính ({selectedIds.length} sp):</span>
                   <strong>{formatPrice(totalSelected)}</strong>
                 </div>
 
-                {discountAmount > 0 && (
-                  <div className="d-flex justify-content-between text-success fw-bold mb-2">
-                    <span>Giảm giá:</span>
-                    <span>-{formatPrice(discountAmount)}</span>
-                  </div>
-                )}
+                {/* Giảm giá - luôn hiện, dù 0đ */}
+                <div className={`d-flex justify-content-between mb-2 fw-bold ${discountAmount > 0 ? "text-success" : "text-muted"}`}>
+                  <span>Giảm giá:</span>
+                  <span>{discountAmount > 0 ? `-${formatPrice(discountAmount)}` : "0 ₫"}</span>
+                </div>
 
                 <hr className="border-2" />
+
+                {/* Tổng thanh toán */}
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <h5 className="fw-bold text-primary m-0">Tổng thanh toán:</h5>
                   <h4 className="text-danger fw-bold m-0">{formatPrice(finalTotal)}</h4>

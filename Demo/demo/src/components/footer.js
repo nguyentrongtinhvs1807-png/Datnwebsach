@@ -47,7 +47,6 @@ const Footer = () => {
               <li><a href="#" className="text-light text-decoration-none">Cập nhật tài khoản</a></li>
               <li><a href="#" className="text-light text-decoration-none">Giỏ hàng</a></li>
               <li><a href="#" className="text-light text-decoration-none">Lịch sử giao dịch</a></li>
-              <li><a href="#" className="text-light text-decoration-none">Sản phẩm yêu thích</a></li>
              <li><a href="orders" className="text-light text-decoration-none">Kiểm tra đơn hàng</a></li>
             </ul>
           </div>
@@ -59,9 +58,7 @@ const Footer = () => {
               <li><a href="about" className="text-light text-decoration-none">Giới thiệu</a></li>
               <li><a href="#" className="text-light text-decoration-none">Facebook</a></li>
               <li><a href="contact" className="text-light text-decoration-none">Liên hệ</a></li>
-              <li><a href="#" className="text-light text-decoration-none">Đặt hàng theo yêu cầu</a></li>
               <li><a href="policy" className="text-light text-decoration-none">Chính sách khách hàng</a></li>
-              <li><a href="#" className="text-light text-decoration-none">Blog sách hay</a></li>
             </ul>
           </div>
         </div>

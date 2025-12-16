@@ -1,90 +1,88 @@
+// app/account/page.tsx (Client Component - "use client")
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button, Container, Row, Col } from "react-bootstrap";
 
-// Chuẩn hóa Interface theo tên cột trong Database (nguoi_dung_id, ten, role)
-interface User {
-  id?: number; // ID phổ biến
-  nguoi_dung_id?: number; // ID từ DB (để khớp với tên cột)
-  ten?: string; // Tên từ DB (để khớp với tên cột)
-  mat_khau?: string;
-  ngay_sinh?: string;
-  email: string;
+type User = {
+  nguoi_dung_id?: number;
+  ten?: string;
+  email?: string;
+  so_dien_thoai?: string;
   dia_chi?: string;
-  role?: string; // Vai trò từ DB (để khớp với tên cột)
-  
-  // Giữ lại các trường dự phòng nếu cần, hoặc loại bỏ chúng
-  ho_ten?: string; 
-  vai_tro?: string;
-}
+  ngay_sinh?: string | null;
+  role?: string;
+  has_password?: boolean;
+};
 
 export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Lấy thông tin người dùng từ localStorage
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error("Lỗi phân tích JSON từ user localStorage:", error);
-        localStorage.removeItem("user");
-        // Có thể redirect nếu parsing lỗi
+    const fetchUser = async () => {
+      const savedUser = localStorage.getItem("user");
+      if (!savedUser) {
+        setLoading(false);
+        return;
       }
-    }
+
+      try {
+        const parsed = JSON.parse(savedUser);
+        const userId = parsed.nguoi_dung_id || parsed.id;
+
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch(`http://localhost:3003/auth/user/${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error("Lỗi lấy thông tin user:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
   }, []);
 
-  // Xử lý đăng xuất
   const handleLogout = () => {
     localStorage.clear();
-    alert("Đã đăng xuất thành công!");
     router.push("/auth/dangnhap");
   };
 
-  // Hiển thị mật khẩu đã che
-  const maskPassword = (password?: string) => {
-    if (!password) return "Chưa có";
-    return "•".repeat(Math.min(password.length, 12));
-  };
-
-  // Định dạng ngày tháng
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr || dateStr.toLowerCase() === 'null') return "Chưa có";
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "Chưa có";
     try {
-      const date = new Date(dateStr);
-      // Kiểm tra tính hợp lệ của ngày
-      if (isNaN(date.getTime())) return "Không hợp lệ"; 
-      return date.toLocaleDateString("vi-VN");
+      return new Date(dateStr).toLocaleDateString("vi-VN");
     } catch {
-      return dateStr;
+      return "Chưa có";
     }
   };
 
+  const displayRole = user?.role === "admin" ? "Quản trị viên" : "Thành viên";
+
+  if (loading) {
+    return <div className="text-center py-5">Đang tải thông tin...</div>;
+  }
+
   if (!user) {
-    // Giao diện khi chưa đăng nhập
     return (
       <Container className="py-5">
         <Row className="justify-content-center">
-          <Col md={8} lg={6}>
-            <Card className="shadow-lg border-0 rounded-4" style={{
-              background: "linear-gradient(135deg, #fff9e6 0%, #ffeecf 100%)"
-            }}>
-              <Card.Body className="p-5 text-center">
-                <h2 className="fw-bold text-dark mb-3">Tài khoản của tôi</h2>
-                <p className="text-muted mb-4">Bạn chưa đăng nhập vào hệ thống.</p>
-                <Button 
-                  variant="warning" 
-                  onClick={() => router.push("/auth/dangnhap")}
-                  className="px-4 py-2 fw-semibold"
-                  style={{ borderRadius: "12px" }}
-                >
-                  Đăng nhập ngay
-                </Button>
-              </Card.Body>
+          <Col md={8}>
+            <Card className="text-center p-5">
+              <h3>Bạn chưa đăng nhập</h3>
+              <Button variant="primary" onClick={() => router.push("/auth/dangnhap")}>
+                Đăng nhập ngay
+              </Button>
             </Card>
           </Col>
         </Row>
@@ -92,128 +90,84 @@ export default function AccountPage() {
     );
   }
 
-  // --- Lấy dữ liệu và Fallback (Ưu tiên theo tên cột DB) ---
-  const userId = user.nguoi_dung_id || user.id || "Chưa có";
-  const userName = user.ten || user.ho_ten || "Người dùng";
-  const userRole = user.role || user.vai_tro || "user";
-  const displayRole = userRole === "admin" || Number(userRole) === 1 ? "Quản trị viên" : "Thành viên";
-
   return (
     <Container className="py-5">
       <Row className="justify-content-center">
         <Col md={10} lg={8}>
-          <Card className="shadow-lg border-0 rounded-4 overflow-hidden" style={{
-            background: "linear-gradient(135deg, #fff9e6 0%, #ffeecf 100%)"
-          }}>
-            {/* Header */}
-            <div className="p-4 text-center" style={{
-              background: "linear-gradient(90deg, #ffc107 0%, #ff9800 100%)",
+          <Card className="shadow-lg border-0 rounded-4 overflow-hidden">
+            <div className="text-center py-5" style={{
+              background: "linear-gradient(90deg, #ffb300, #ff9800)",
               color: "white"
             }}>
-              <div className="mb-3">
-                <div className="rounded-circle bg-white d-inline-flex align-items-center justify-content-center" 
-                  style={{ width: "100px", height: "100px" }}>
-                  <span style={{ fontSize: "3rem", color: "#ff9800" }}>
-                    {(userName.charAt(0) || "U").toUpperCase()}
-                  </span>
-                </div>
+              <div className="rounded-circle bg-white d-inline-flex align-items-center justify-content-center mx-auto mb-3"
+                style={{ width: "120px", height: "120px", fontSize: "4rem", color: "#ff9800" }}>
+                {(user.ten?.charAt(0) || "N").toUpperCase()}
               </div>
-              <h2 className="fw-bold mb-1">{userName}</h2>
-              <span className="badge bg-light text-dark px-3 py-2" style={{ fontSize: "0.9rem" }}>
+              <h2 className="fw-bold mb-2">Người dùng</h2>
+              <span className="badge bg-white text-dark px-4 py-2 rounded-pill fs-6">
                 {displayRole}
               </span>
             </div>
 
-            <Card.Body className="p-4">
-              {/* Thông tin chi tiết */}
+            <Card.Body className="p-5 bg-light">
               <Row className="g-4">
-                {/* 1. Mã người dùng (nguoi_dung_id) */}
                 <Col md={6}>
-                  <div className="p-3 rounded-3 h-100" style={{ background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 193, 7, 0.2)" }}>
-                    <div className="text-muted small mb-1 fw-semibold">Mã người dùng</div>
-                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
-                      {userId}
-                    </div>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Mã người dùng</small>
+                    <h5 className="fw-bold mt-2">{user.nguoi_dung_id}</h5>
                   </div>
                 </Col>
-
-                {/* 2. Tên người dùng (ten) */}
                 <Col md={6}>
-                  <div className="p-3 rounded-3 h-100" style={{ background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 193, 7, 0.2)" }}>
-                    <div className="text-muted small mb-1 fw-semibold">Tên người dùng</div>
-                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
-                      {userName}
-                    </div>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Tên người dùng</small>
+                    <h5 className="fw-bold mt-2">{user.ten || "Người dùng"}</h5>
                   </div>
                 </Col>
-
-                {/* 3. Mật khẩu (mat_khau) */}
                 <Col md={6}>
-                  <div className="p-3 rounded-3 h-100" style={{ background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 193, 7, 0.2)" }}>
-                    <div className="text-muted small mb-1 fw-semibold">Mật khẩu</div>
-                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem", fontFamily: "monospace" }}>
-                      {maskPassword(user.mat_khau)}
-                    </div>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Email</small>
+                    <h5 className="fw-bold mt-2">{user.email}</h5>
                   </div>
                 </Col>
-
-                {/* 4. Ngày sinh (ngay_sinh) */}
                 <Col md={6}>
-                  <div className="p-3 rounded-3 h-100" style={{ background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 193, 7, 0.2)" }}>
-                    <div className="text-muted small mb-1 fw-semibold">Ngày sinh</div>
-                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
-                      {formatDate(user.ngay_sinh)}
-                    </div>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Số điện thoại</small>
+                    <h5 className="fw-bold mt-2">{user.so_dien_thoai || "Chưa có"}</h5>
                   </div>
                 </Col>
-
-                {/* 5. Email (email) */}
                 <Col md={6}>
-                  <div className="p-3 rounded-3 h-100" style={{ background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 193, 7, 0.2)" }}>
-                    <div className="text-muted small mb-1 fw-semibold">Email</div>
-                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
-                      {user.email || "Chưa có"}
-                    </div>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Địa chỉ</small>
+                    <h5 className="fw-bold mt-2">{user.dia_chi || "Chưa có"}</h5>
                   </div>
                 </Col>
-
-                {/* 6. Địa chỉ (dia_chi) */}
                 <Col md={6}>
-                  <div className="p-3 rounded-3 h-100" style={{ background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 193, 7, 0.2)" }}>
-                    <div className="text-muted small mb-1 fw-semibold">Địa chỉ</div>
-                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
-                      {user.dia_chi || "Chưa có"}
-                    </div>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Ngày sinh</small>
+                    <h5 className="fw-bold mt-2">{formatDate(user.ngay_sinh)}</h5>
                   </div>
                 </Col>
-
-                {/* 7. Vai trò (role) */}
-                <Col md={12}>
-                  <div className="p-3 rounded-3" style={{ background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 193, 7, 0.2)" }}>
-                    <div className="text-muted small mb-1 fw-semibold">Vai trò</div>
-                    <div className="fw-bold text-dark" style={{ fontSize: "1.1rem" }}>
-                      {displayRole}
-                    </div>
+                <Col md={6}>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Mật khẩu</small>
+                    <h5 className="fw-bold mt-2 font-monospace">
+                      {user.has_password ? "••••••••••••" : "Chưa có"}
+                    </h5>
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <div className="bg-white p-4 rounded-3 shadow-sm">
+                    <small className="text-muted">Vai trò</small>
+                    <h5 className="fw-bold mt-2 text-success">{displayRole}</h5>
                   </div>
                 </Col>
               </Row>
 
-              {/* Các nút hành động */}
-              <div className="d-flex justify-content-center gap-3 mt-4 pt-3">
-                <Button
-                  variant="outline-success"
-                  onClick={() => router.push("/auth/doi-pass")}
-                  className="px-4 py-2 fw-semibold"
-                  style={{ borderRadius: "12px", minWidth: "150px" }}
-                >
+              <div className="text-center mt-5">
+                <Button variant="outline-primary" className="me-3 px-5 py-3 rounded-pill" onClick={() => router.push("/auth/doi-pass")}>
                   Đổi mật khẩu
                 </Button>
-                <Button 
-                  variant="outline-danger" 
-                  onClick={handleLogout}
-                  className="px-4 py-2 fw-semibold"
-                  style={{ borderRadius: "12px", minWidth: "150px" }}
-                >
+                <Button variant="outline-danger" className="px-5 py-3 rounded-pill" onClick={handleLogout}>
                   Đăng xuất
                 </Button>
               </div>
